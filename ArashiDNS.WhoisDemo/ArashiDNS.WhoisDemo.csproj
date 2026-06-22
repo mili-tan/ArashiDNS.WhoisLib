@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ArashiDNS.WhoisLib\ArashiDNS.WhoisLib.csproj" />
+    <ProjectReference Include="..\ArashiDNS.WhoisLib\ArashiDNS.WhoisLib.csproj" />
   </ItemGroup>
 
 </Project>
