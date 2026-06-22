@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>ArashiDNS.WhoisDemo</RootNamespace>
+    <AssemblyName>ArashiDNS.WhoisDemo</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ArashiDNS.WhoisLib\ArashiDNS.WhoisLib.csproj" />
+  </ItemGroup>
+
+</Project>
