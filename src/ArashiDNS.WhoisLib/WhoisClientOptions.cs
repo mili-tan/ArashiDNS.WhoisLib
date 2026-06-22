@@ -7,16 +7,20 @@ namespace ArashiDNS.WhoisLib;
 /// </summary>
 public enum QueryStrategy
 {
-    /// <summary>Rdap优先</summary>
+    /// <summary>Rdap优先: RDAP+传统 → WHOIS+传统 → WHOIS+LLM</summary>
     RdapFirst,
-    /// <summary>Whois优先</summary>
+    /// <summary>Whois优先: WHOIS+传统 → RDAP+传统 → WHOIS+LLM</summary>
     WhoisFirst,
-    /// <summary>仅Rdap</summary>
-    RdapOnly,
-    /// <summary>仅Whois</summary>
-    WhoisOnly,
-    /// <summary>仅LLM（需要API Key）</summary>
-    LlmOnly
+    /// <summary>Rdap+传统优先，跳过WHOIS+传统，LLM兜底: RDAP+传统 → WHOIS+LLM</summary>
+    RdapFirstWhoisLlmFallback,
+    /// <summary>仅RDAP+传统</summary>
+    RdapTraditionOnly,
+    /// <summary>仅WHOIS+传统</summary>
+    WhoisTraditionOnly,
+    /// <summary>仅RDAP+LLM</summary>
+    RdapLlmOnly,
+    /// <summary>仅WHOIS+LLM</summary>
+    WhoisLlmOnly
 }
 
 /// <summary>

@@ -42,9 +42,9 @@ class Program
             LlmEnableThinking = enableThinking
         };
 
-        if (useRdap) options.Strategy = QueryStrategy.RdapOnly;
-        else if (useWhois) options.Strategy = QueryStrategy.WhoisOnly;
-        else if (useLlm) options.Strategy = QueryStrategy.LlmOnly;
+        if (useRdap) options.Strategy = QueryStrategy.RdapTraditionOnly;
+        else if (useWhois) options.Strategy = QueryStrategy.WhoisTraditionOnly;
+        else if (useLlm) options.Strategy = QueryStrategy.WhoisLlmOnly;
 
         Console.WriteLine($"Querying: {query}\n");
 

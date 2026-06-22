@@ -2,21 +2,16 @@ using ArashiDNS.WhoisLib.Contracts.Models;
 using ArashiDNS.WhoisLib.Core;
 using ArashiDNS.WhoisLib.Data;
 using ArashiDNS.WhoisLib.Data.Cache;
-using ArashiDNS.WhoisLib.Detection;
 using ArashiDNS.WhoisLib.Formatting;
 using ArashiDNS.WhoisLib.ServerDiscovery;
 
 namespace ArashiDNS.WhoisLib;
 
-/// <summary>
-/// ArashiDNS WHOIS/RDAP 查询客户端
-/// </summary>
 public class WhoisLookup : IDisposable
 {
     private readonly WhoisClientOptions _options;
     private readonly WhoisClient _whoisClient;
     private readonly RdapClient _rdapClient;
-    private readonly RegistrarListProvider _registrarProvider;
     private readonly TraditionalFormatter _traditionalFormatter;
     private readonly LlmFormatter? _llmFormatter;
     private bool _disposed;
@@ -27,17 +22,16 @@ public class WhoisLookup : IDisposable
 
         var cache = new FileCacheProvider(_options.CacheDirectory);
         var downloader = new IanaDataDownloader();
-        _registrarProvider = new RegistrarListProvider(cache, downloader);
+        var registrarProvider = new RegistrarListProvider(cache, downloader);
         var ipProvider = new IpAllocationProvider(cache, downloader);
 
-        var knownLookup = new KnownServerLookup();
-        var dnsLookup = new DnsServerLookup();
-        var ianaLookup = new IanaServerLookup();
-        var serverFinder = new CompositeServerFinder(knownLookup, dnsLookup, ianaLookup, ipProvider);
+        var serverFinder = new CompositeServerFinder(
+            new KnownServerLookup(), new DnsServerLookup(),
+            new IanaServerLookup(), ipProvider);
 
         _whoisClient = new WhoisClient(serverFinder);
         _rdapClient = new RdapClient();
-        _traditionalFormatter = new TraditionalFormatter(_registrarProvider);
+        _traditionalFormatter = new TraditionalFormatter(registrarProvider);
 
         var apiKey = _options.LlmApiKey ?? Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
         if (!string.IsNullOrEmpty(apiKey))
@@ -52,116 +46,37 @@ public class WhoisLookup : IDisposable
         }
     }
 
-    /// <summary>
-    /// 查询域名/IP/ASN信息
-    /// </summary>
     public async Task<QueryResult> QueryAsync(string query)
     {
         return _options.Strategy switch
         {
-            QueryStrategy.RdapFirst => await QueryRdapFirstAsync(query),
-            QueryStrategy.WhoisFirst => await QueryWhoisFirstAsync(query),
-            QueryStrategy.RdapOnly => await QueryRdapOnlyAsync(query),
-            QueryStrategy.WhoisOnly => await QueryWhoisOnlyAsync(query),
-            QueryStrategy.LlmOnly => await QueryLlmOnlyAsync(query),
-            _ => await QueryRdapFirstAsync(query)
+            QueryStrategy.RdapFirst => await RunAsync(query, Steps.RdapTrad, Steps.WhoisTrad, Steps.WhoisLlm),
+            QueryStrategy.WhoisFirst => await RunAsync(query, Steps.WhoisTrad, Steps.RdapTrad, Steps.WhoisLlm),
+            QueryStrategy.RdapFirstWhoisLlmFallback => await RunAsync(query, Steps.RdapTrad, Steps.WhoisLlm),
+            QueryStrategy.RdapTraditionOnly => await RunAsync(query, Steps.RdapTrad),
+            QueryStrategy.WhoisTraditionOnly => await RunAsync(query, Steps.WhoisTrad),
+            QueryStrategy.RdapLlmOnly => await RunAsync(query, Steps.RdapLlm),
+            QueryStrategy.WhoisLlmOnly => await RunAsync(query, Steps.WhoisLlm),
+            _ => await RunAsync(query, Steps.RdapTrad, Steps.WhoisTrad, Steps.WhoisLlm)
         };
     }
 
-    private async Task<QueryResult> QueryRdapFirstAsync(string query)
+    private async Task<QueryResult> RunAsync(string query, params Steps[] steps)
     {
-        // 1. RDAP + 传统
-        var result = await TryRdapTraditionalAsync(query);
-        if (result.IsSuccessful) return result;
-
-        // 2. WHOIS + 传统
-        result = await TryWhoisTraditionalAsync(query);
-        if (result.IsSuccessful) return result;
-
-        // 3. WHOIS + LLM
-        if (_llmFormatter != null)
+        foreach (var step in steps)
         {
-            result = await TryWhoisLlmAsync(query);
+            var result = step switch
+            {
+                Steps.RdapTrad => await TryRdapTraditionalAsync(query),
+                Steps.WhoisTrad => await TryWhoisTraditionalAsync(query),
+                Steps.RdapLlm => await TryRdapLlmAsync(query),
+                Steps.WhoisLlm => await TryWhoisLlmAsync(query),
+                _ => new QueryResult { IsSuccessful = false }
+            };
             if (result.IsSuccessful) return result;
         }
 
-        return new QueryResult
-        {
-            IsSuccessful = false,
-            ErrorMessage = "All query methods failed"
-        };
-    }
-
-    private async Task<QueryResult> QueryWhoisFirstAsync(string query)
-    {
-        // 1. WHOIS + 传统
-        var result = await TryWhoisTraditionalAsync(query);
-        if (result.IsSuccessful) return result;
-
-        // 2. RDAP + 传统
-        result = await TryRdapTraditionalAsync(query);
-        if (result.IsSuccessful) return result;
-
-        // 3. WHOIS + LLM
-        if (_llmFormatter != null)
-        {
-            result = await TryWhoisLlmAsync(query);
-            if (result.IsSuccessful) return result;
-        }
-
-        return new QueryResult
-        {
-            IsSuccessful = false,
-            ErrorMessage = "All query methods failed"
-        };
-    }
-
-    private async Task<QueryResult> QueryRdapOnlyAsync(string query)
-    {
-        return await TryRdapTraditionalAsync(query);
-    }
-
-    private async Task<QueryResult> QueryWhoisOnlyAsync(string query)
-    {
-        return await TryWhoisTraditionalAsync(query);
-    }
-
-    private async Task<QueryResult> QueryLlmOnlyAsync(string query)
-    {
-        if (_llmFormatter == null)
-        {
-            return new QueryResult
-            {
-                IsSuccessful = false,
-                ErrorMessage = "LLM API key not configured"
-            };
-        }
-
-        // 先获取原始数据
-        var whoisResponse = await _whoisClient.QueryAsync(query);
-        if (!whoisResponse.IsSuccessful)
-        {
-            whoisResponse = await _rdapClient.QueryAsync(query);
-        }
-
-        if (!whoisResponse.IsSuccessful)
-        {
-            return new QueryResult
-            {
-                IsSuccessful = false,
-                ErrorMessage = whoisResponse.ErrorMessage
-            };
-        }
-
-        var formatted = await _llmFormatter.FormatAsync(whoisResponse);
-        return new QueryResult
-        {
-            Data = formatted,
-            RawResponse = whoisResponse.RawResponse,
-            UsedProtocol = "WHOIS",
-            UsedFormatter = "LLM",
-            IsSuccessful = true
-        };
+        return new QueryResult { IsSuccessful = false, ErrorMessage = "All query methods failed" };
     }
 
     private async Task<QueryResult> TryRdapTraditionalAsync(string query)
@@ -172,20 +87,16 @@ public class WhoisLookup : IDisposable
             if (!response.IsSuccessful)
                 return new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage };
 
-            var formatted = await _traditionalFormatter.FormatAsync(response);
             return new QueryResult
             {
-                Data = formatted,
+                Data = await _traditionalFormatter.FormatAsync(response),
                 RawResponse = response.RawResponse,
                 UsedProtocol = "RDAP",
                 UsedFormatter = "Traditional",
                 IsSuccessful = true
             };
         }
-        catch (Exception ex)
-        {
-            return new QueryResult { IsSuccessful = false, ErrorMessage = ex.Message };
-        }
+        catch (Exception ex) { return new QueryResult { IsSuccessful = false, ErrorMessage = ex.Message }; }
     }
 
     private async Task<QueryResult> TryWhoisTraditionalAsync(string query)
@@ -196,20 +107,39 @@ public class WhoisLookup : IDisposable
             if (!response.IsSuccessful)
                 return new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage };
 
-            var formatted = await _traditionalFormatter.FormatAsync(response);
             return new QueryResult
             {
-                Data = formatted,
+                Data = await _traditionalFormatter.FormatAsync(response),
                 RawResponse = response.RawResponse,
                 UsedProtocol = "WHOIS",
                 UsedFormatter = "Traditional",
                 IsSuccessful = true
             };
         }
-        catch (Exception ex)
+        catch (Exception ex) { return new QueryResult { IsSuccessful = false, ErrorMessage = ex.Message }; }
+    }
+
+    private async Task<QueryResult> TryRdapLlmAsync(string query)
+    {
+        if (_llmFormatter == null)
+            return new QueryResult { IsSuccessful = false, ErrorMessage = "LLM not configured" };
+
+        try
         {
-            return new QueryResult { IsSuccessful = false, ErrorMessage = ex.Message };
+            var response = await _rdapClient.QueryAsync(query);
+            if (!response.IsSuccessful)
+                return new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage };
+
+            return new QueryResult
+            {
+                Data = await _llmFormatter.FormatAsync(response),
+                RawResponse = response.RawResponse,
+                UsedProtocol = "RDAP",
+                UsedFormatter = "LLM",
+                IsSuccessful = true
+            };
         }
+        catch (Exception ex) { return new QueryResult { IsSuccessful = false, ErrorMessage = ex.Message }; }
     }
 
     private async Task<QueryResult> TryWhoisLlmAsync(string query)
@@ -223,27 +153,22 @@ public class WhoisLookup : IDisposable
             if (!response.IsSuccessful)
                 return new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage };
 
-            var formatted = await _llmFormatter.FormatAsync(response);
             return new QueryResult
             {
-                Data = formatted,
+                Data = await _llmFormatter.FormatAsync(response),
                 RawResponse = response.RawResponse,
                 UsedProtocol = "WHOIS",
                 UsedFormatter = "LLM",
                 IsSuccessful = true
             };
         }
-        catch (Exception ex)
-        {
-            return new QueryResult { IsSuccessful = false, ErrorMessage = ex.Message };
-        }
+        catch (Exception ex) { return new QueryResult { IsSuccessful = false, ErrorMessage = ex.Message }; }
     }
+
+    private enum Steps { RdapTrad, WhoisTrad, RdapLlm, WhoisLlm }
 
     public void Dispose()
     {
-        if (!_disposed)
-        {
-            _disposed = true;
-        }
+        if (!_disposed) _disposed = true;
     }
 }
