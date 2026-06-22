@@ -16,7 +16,7 @@ public class RdapClient : IWhoisClient
 
     public Action<string, bool, string?>? OnRequest { get; set; }
 
-    public RdapClient(HttpClient? httpClient = null, RdapBootstrapProvider? bootstrapProvider = null)
+    public RdapClient(HttpClient? httpClient = null, RdapBootstrapProvider? bootstrapProvider = null, string? userAgent = null)
     {
         if (httpClient != null)
         {
@@ -34,7 +34,7 @@ public class RdapClient : IWhoisClient
         }
 
         _httpClient.DefaultRequestHeaders.Add("Accept", "application/rdap+json");
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "WhoisLib/1.0");
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", userAgent ?? "ArashiDNS.WhoisLib/1.0");
         _parser = new RdapResponseParser();
         _bootstrapProvider = bootstrapProvider;
     }

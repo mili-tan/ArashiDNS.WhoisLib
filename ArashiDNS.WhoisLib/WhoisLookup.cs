@@ -21,7 +21,7 @@ public class WhoisLookup : IDisposable
         _options = options ?? new WhoisClientOptions();
 
         var cache = new FileCacheProvider(_options.CacheDirectory);
-        var downloader = new IanaDataDownloader();
+        var downloader = new IanaDataDownloader(userAgent: _options.UserAgent);
         var registrarProvider = new RegistrarListProvider(cache, downloader);
         var ipProvider = new IpAllocationProvider(cache, downloader);
 
@@ -30,7 +30,7 @@ public class WhoisLookup : IDisposable
             new IanaServerLookup(), ipProvider);
 
         _whoisClient = new WhoisClient(serverFinder);
-        _rdapClient = new RdapClient();
+        _rdapClient = new RdapClient(userAgent: _options.UserAgent);
         _traditionalFormatter = new TraditionalFormatter(registrarProvider);
 
         var apiKey = _options.LlmApiKey ?? Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");

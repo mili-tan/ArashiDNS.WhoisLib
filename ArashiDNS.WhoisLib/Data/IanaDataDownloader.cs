@@ -17,10 +17,10 @@ public class IanaDataDownloader
 {
     private readonly HttpClient _httpClient;
 
-    public IanaDataDownloader(HttpClient? httpClient = null)
+    public IanaDataDownloader(HttpClient? httpClient = null, string? userAgent = null)
     {
         _httpClient = httpClient ?? new HttpClient();
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "WhoisLib/1.0");
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", userAgent ?? "ArashiDNS.WhoisLib/1.0");
     }
 
     public async Task<List<RegistrarEntry>> DownloadRegistrarsAsync()

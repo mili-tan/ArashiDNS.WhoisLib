@@ -72,4 +72,7 @@ public class WhoisClientOptions
 
     /// <summary>自定义缓存目录</summary>
     public string? CacheDirectory { get; set; }
+
+    /// <summary>User-Agent字符串（默认 ArashiDNS.WhoisLib/1.0）</summary>
+    public string UserAgent { get; set; } = "ArashiDNS.WhoisLib/1.0";
 }

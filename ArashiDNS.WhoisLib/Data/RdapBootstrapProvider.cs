@@ -20,11 +20,11 @@ public class RdapBootstrapProvider
     private List<IpRdapRange>? _ipv6Endpoints;
     private List<AsnRdapRange>? _asnEndpoints;
 
-    public RdapBootstrapProvider(ICacheProvider cache, HttpClient? httpClient = null)
+    public RdapBootstrapProvider(ICacheProvider cache, HttpClient? httpClient = null, string? userAgent = null)
     {
         _cache = cache;
         _httpClient = httpClient ?? new HttpClient();
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "WhoisLib/1.0");
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", userAgent ?? "ArashiDNS.WhoisLib/1.0");
     }
 
     public async Task<string?> GetDnsRdapEndpointAsync(string tld)
