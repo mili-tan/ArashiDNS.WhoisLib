@@ -110,15 +110,30 @@ public class WhoisLookup : IDisposable
                     if (llmResult.IsSuccessful && !ShouldFallbackToLlm(llmResult))
                     {
                         llmResult.Trace = trace;
-                        return llmResult;
+                        return PostProcess(llmResult);
                     }
                 }
 
-                return result;
+                return PostProcess(result);
             }
         }
 
         return new QueryResult { IsSuccessful = false, ErrorMessage = "All query methods failed", Trace = trace };
+    }
+
+    private QueryResult PostProcess(QueryResult result)
+    {
+        if (_options.FilterEmptyContacts && result.Data?.Contacts != null)
+        {
+            result.Data.Contacts = result.Data.Contacts.Where(c =>
+                !string.IsNullOrEmpty(c.Name) ||
+                !string.IsNullOrEmpty(c.Organization) ||
+                !string.IsNullOrEmpty(c.Email) ||
+                !string.IsNullOrEmpty(c.Phone) ||
+                !string.IsNullOrEmpty(c.Country)
+            ).ToList();
+        }
+        return result;
     }
 
     private static bool ShouldFallbackToLlm(QueryResult result)

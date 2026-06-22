@@ -191,6 +191,8 @@ class Program
                 if (c.Name is { Length: > 0 }) Console.WriteLine($"    Name: {c.Name}");
                 if (c.Organization is { Length: > 0 }) Console.WriteLine($"    Org: {c.Organization}");
                 if (c.Email is { Length: > 0 }) Console.WriteLine($"    Email: {c.Email}");
+                if (c.Phone is { Length: > 0 }) Console.WriteLine($"    Phone: {c.Phone}");
+                if (c.Country is { Length: > 0 }) Console.WriteLine($"    Country: {c.Country}");
             }
         }
 

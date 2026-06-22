@@ -75,4 +75,7 @@ public class WhoisClientOptions
 
     /// <summary>User-Agent字符串（默认 ArashiDNS.WhoisLib/1.0）</summary>
     public string UserAgent { get; set; } = "ArashiDNS.WhoisLib/1.0";
+
+    /// <summary>是否过滤空联系人（默认true）</summary>
+    public bool FilterEmptyContacts { get; set; } = true;
 }
