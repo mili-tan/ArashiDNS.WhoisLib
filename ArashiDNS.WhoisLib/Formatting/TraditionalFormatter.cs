@@ -17,40 +17,41 @@ public class TraditionalFormatter : IWhoisFormatter
         "yyyy-MM-ddTHH:mm:ssZ", "yyyy-MM-ddTHH:mm:sszzz", "yyyy-MM-ddTHH:mm:ss+0000",
         "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd", "dd-MMM-yyyy", "dd.MM.yyyy", "MM/dd/yyyy",
         "yyyyMMdd", "ddd MMM d HH:mm:ss yyyy", "ddd MMM dd HH:mm:ss yyyy",
-        "yyyy. MM. dd.", "yyyy/MM/dd", "yyyy.MM.dd"
+        "yyyy. MM. dd.", "yyyy/MM/dd", "yyyy.MM.dd",
+        "ddd MMM dd HH:mm:ss yyyy", "ddd MMM d HH:mm:ss yyyy"
     ];
 
     private static readonly Dictionary<string, string[]> DomainFieldMappings = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["domain"] = ["Domain Name:", "Domain name:", "domain name:", "domain:", "[Domain Name]"],
-        ["registrar_name"] = ["Registrar:", "Sponsoring Registrar:", "Registrar Name:", "Authorized Agency:"],
+        ["domain"] = ["Domain Name:", "Domain name:", "domain name:", "domain:", "[Domain Name]", "Domain "],
+        ["registrar_name"] = ["Registrar:", "Sponsoring Registrar:", "Registrar Name:", "Authorized Agency:", "Sponsoring Registrar"],
         ["registrar_iana_id"] = ["Registrar IANA ID:", "Registrar ID:"],
         ["registrar_url"] = ["Registrar URL:", "Registrar Website:", "URL:"],
         ["registrar_whois"] = ["Registrar WHOIS Server:", "Whois Server:"],
-        ["created"] = ["Creation Date:", "Created:", "Created Date:", "Registration Date:", "Registered on:", "Registered Date:", "Registration Time:"],
-        ["updated"] = ["Updated Date:", "Modified:", "Last Modified:", "Last Updated:", "Last Updated Date:"],
-        ["expires"] = ["Registry Expiry Date:", "Expiration Date:", "Expires:", "Expiry Date:", "Registrar Registration Expiration Date:", "Expiration Time:"],
-        ["status"] = ["Domain Status:", "Status:", "Registration status:"],
-        ["nameserver"] = ["Name Server:", "Nameserver:", "nserver:", "Name servers:", "Name Servers:"],
-        ["registrant_name"] = ["Registrant Name:", "Registrant Contact Name:", "Registrant:"],
-        ["registrant_org"] = ["Registrant Organization:", "Registrant Contact Organization:", "Organization:", "Org Name:"],
-        ["registrant_email"] = ["Registrant Email:", "Registrant Contact Email:", "Registrant Email Address:", "AC E-Mail:"],
-        ["registrant_street"] = ["Registrant Street:", "Registrant Contact Street:", "Address:"],
+        ["created"] = ["Creation Date:", "Created:", "Created Date:", "Registration Date:", "Registered on:", "Registered Date:", "Registration Time:", "Record created:", "Record Created:"],
+        ["updated"] = ["Updated Date:", "Modified:", "Last Modified:", "Last Updated:", "Last Updated Date:", "Record last updated on:", "Record last updated:", "Last Update:"],
+        ["expires"] = ["Registry Expiry Date:", "Expiration Date:", "Expires:", "Expiry Date:", "Registrar Registration Expiration Date:", "Expiration Time:", "Record expires on:", "Record expires:", "Expiration:"],
+        ["status"] = ["Domain Status:", "Status:", "Registration status:", "Domain status:"],
+        ["nameserver"] = ["Name Server:", "Nameserver:", "nserver:", "Name servers:", "Name Servers:", "Name servers in the listed order:", "Nameservers:"],
+        ["registrant_name"] = ["Registrant Name:", "Registrant Contact Name:", "Registrant:", "Name:"],
+        ["registrant_org"] = ["Registrant Organization:", "Registrant Contact Organization:", "Organization:", "Org Name:", "Organisation:"],
+        ["registrant_email"] = ["Registrant Email:", "Registrant Contact Email:", "Registrant Email Address:", "AC E-Mail:", "Email:", "E-mail:"],
+        ["registrant_street"] = ["Registrant Street:", "Registrant Contact Street:", "Address:", "Street:"],
         ["registrant_city"] = ["Registrant City:", "Registrant Contact City:", "City:"],
-        ["registrant_state"] = ["Registrant State/Province:", "Registrant Contact State/Province:", "StateProv:"],
-        ["registrant_postal"] = ["Registrant Postal Code:", "Registrant Contact Postal Code:", "Registrant Zip:", "PostalCode:"],
-        ["registrant_country"] = ["Registrant Country:", "Registrant Contact Country:", "Country:"],
-        ["registrant_phone"] = ["Registrant Phone:", "Registrant Contact Phone:", "Phone:"],
-        ["admin_name"] = ["Admin Name:", "Administrative Contact Name:", "Admin Contact Name:"],
-        ["admin_org"] = ["Admin Organization:", "Administrative Contact Organization:"],
-        ["admin_email"] = ["Admin Email:", "Administrative Contact Email:"],
-        ["admin_phone"] = ["Admin Phone:", "Administrative Contact Phone:"],
-        ["tech_name"] = ["Tech Name:", "Technical Contact Name:", "Tech Contact Name:"],
-        ["tech_org"] = ["Tech Organization:", "Technical Contact Organization:"],
-        ["tech_email"] = ["Tech Email:", "Technical Contact Email:"],
-        ["tech_phone"] = ["Tech Phone:", "Technical Contact Phone:"],
-        ["registry_domain_id"] = ["Registry Domain ID:", "Domain ID:", "ROID:"],
-        ["dnssec"] = ["DNSSEC:"],
+        ["registrant_state"] = ["Registrant State/Province:", "Registrant Contact State/Province:", "StateProv:", "State:", "Province:"],
+        ["registrant_postal"] = ["Registrant Postal Code:", "Registrant Contact Postal Code:", "Registrant Zip:", "PostalCode:", "Zip:", "Postal Code:"],
+        ["registrant_country"] = ["Registrant Country:", "Registrant Contact Country:", "Country:", "Country Code:"],
+        ["registrant_phone"] = ["Registrant Phone:", "Registrant Contact Phone:", "Phone:", "phone:", "Telephone:"],
+        ["admin_name"] = ["Admin Name:", "Administrative Contact Name:", "Admin Contact Name:", "Admin:"],
+        ["admin_org"] = ["Admin Organization:", "Administrative Contact Organization:", "Admin Organisation:"],
+        ["admin_email"] = ["Admin Email:", "Administrative Contact Email:", "Admin E-mail:"],
+        ["admin_phone"] = ["Admin Phone:", "Administrative Contact Phone:", "Admin Telephone:"],
+        ["tech_name"] = ["Tech Name:", "Technical Contact Name:", "Tech Contact Name:", "Technical:"],
+        ["tech_org"] = ["Tech Organization:", "Technical Contact Organization:", "Tech Organisation:"],
+        ["tech_email"] = ["Tech Email:", "Technical Contact Email:", "Tech E-mail:"],
+        ["tech_phone"] = ["Tech Phone:", "Technical Contact Phone:", "Tech Telephone:"],
+        ["registry_domain_id"] = ["Registry Domain ID:", "Domain ID:", "ROID:", "Registry ID:"],
+        ["dnssec"] = ["DNSSEC:", "DNSSEC"],
     };
 
     private static readonly Dictionary<string, string[]> IpFieldMappings = new(StringComparer.OrdinalIgnoreCase)
@@ -90,6 +91,23 @@ public class TraditionalFormatter : IWhoisFormatter
         {
             var fields = ExtractFields(response.RawResponse, DomainFieldMappings);
             var parsed = ParseDomainResponse(fields, response.RawResponse);
+            
+            // Handle section-based WHOIS formats (like .kg)
+            if (string.IsNullOrEmpty(parsed.Domain) || 
+                (string.IsNullOrEmpty(parsed.Registrar?.Name) && parsed.Dates?.Expires == null))
+            {
+                var sectionParsed = ParseSectionBasedWhois(response.RawResponse);
+                if (!string.IsNullOrEmpty(sectionParsed.Domain))
+                    parsed.Domain = sectionParsed.Domain;
+                if (parsed.Dates?.Expires == null && sectionParsed.Dates?.Expires != null)
+                    parsed.Dates = sectionParsed.Dates;
+                if (string.IsNullOrEmpty(parsed.Registrar?.Name) && sectionParsed.Registrar != null)
+                    parsed.Registrar = sectionParsed.Registrar;
+                if (parsed.NameServers.Count == 0 && sectionParsed.NameServers.Count > 0)
+                    parsed.NameServers = sectionParsed.NameServers;
+                if (parsed.Contacts.Registrant == null && sectionParsed.Contacts.Registrant != null)
+                    parsed.Contacts = sectionParsed.Contacts;
+            }
             
             response.Domain = parsed.Domain;
             response.Dates = parsed.Dates;
@@ -214,6 +232,8 @@ public class TraditionalFormatter : IWhoisFormatter
             foreach (var mapping in sortedMappings)
             {
                 var prefix = mapping.Prefix;
+                
+                // Case-insensitive prefix matching
                 if (trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 {
                     var afterPrefix = trimmed.Length > prefix.Length ? trimmed[prefix.Length] : '\0';
@@ -228,6 +248,13 @@ public class TraditionalFormatter : IWhoisFormatter
                         }
                         break;
                     }
+                }
+                
+                // Also check for case-insensitive "contains" for section headers
+                if (prefix.EndsWith(':') && trimmed.Contains(prefix.TrimEnd(':'), StringComparison.OrdinalIgnoreCase))
+                {
+                    // Handle section-based formats where the value is on the next line
+                    // This is a fallback for formats like "Administrative Contact:" followed by fields
                 }
             }
         }
@@ -330,5 +357,141 @@ public class TraditionalFormatter : IWhoisFormatter
         if (string.IsNullOrEmpty(domain)) return string.Empty;
         var parts = domain.TrimEnd('.').Split('.');
         return parts.Length > 0 ? parts[^1].ToLowerInvariant() : string.Empty;
+    }
+
+    /// <summary>
+    /// Parse section-based WHOIS formats (like .kg, .cn, etc.)
+    /// </summary>
+    private static WhoisResponse ParseSectionBasedWhois(string rawResponse)
+    {
+        var response = new WhoisResponse { RawResponse = rawResponse };
+        var lines = rawResponse.Split('\n');
+        var contacts = new ContactCollection();
+        ContactInfo? currentContact = null;
+        var nameServers = new List<string>();
+        var inNameserverSection = false;
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('%') || trimmed.StartsWith('#'))
+                continue;
+
+            // Domain: "Domain AC.KG (ACTIVE)"
+            if (trimmed.StartsWith("Domain ", StringComparison.OrdinalIgnoreCase) && !trimmed.Contains("Status"))
+            {
+                var parts = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2)
+                {
+                    response.Domain = parts[1].TrimEnd('.').ToUpperInvariant();
+                    if (response.Domain.Contains('('))
+                        response.Domain = response.Domain.Split('(')[0].Trim();
+                }
+            }
+
+            // Contact sections
+            if (trimmed.EndsWith("Contact:", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.EndsWith("Contact", StringComparison.OrdinalIgnoreCase))
+            {
+                currentContact = new ContactInfo();
+                if (trimmed.Contains("Admin", StringComparison.OrdinalIgnoreCase))
+                    contacts.Admin = currentContact;
+                else if (trimmed.Contains("Tech", StringComparison.OrdinalIgnoreCase))
+                    contacts.Tech = currentContact;
+                else if (trimmed.Contains("Bill", StringComparison.OrdinalIgnoreCase))
+                    contacts.Billing = currentContact;
+                else
+                    contacts.Registrant = currentContact;
+                continue;
+            }
+
+            // Contact fields
+            if (currentContact != null)
+            {
+                if (trimmed.StartsWith("Name:", StringComparison.OrdinalIgnoreCase))
+                    currentContact.Name = trimmed[5..].Trim();
+                else if (trimmed.StartsWith("Address:", StringComparison.OrdinalIgnoreCase))
+                    currentContact.Street = trimmed[8..].Trim();
+                else if (trimmed.StartsWith("Email:", StringComparison.OrdinalIgnoreCase))
+                    currentContact.Email = trimmed[6..].Trim();
+                else if (trimmed.StartsWith("phone:", StringComparison.OrdinalIgnoreCase) ||
+                         trimmed.StartsWith("Phone:", StringComparison.OrdinalIgnoreCase))
+                    currentContact.Phone = trimmed[6..].Trim();
+            }
+
+            // Dates
+            if (trimmed.StartsWith("Record created:", StringComparison.OrdinalIgnoreCase))
+            {
+                var dateStr = trimmed[15..].Trim();
+                if (DateTime.TryParse(dateStr, out var date))
+                    response.Dates ??= new DomainDates();
+                response.Dates!.Created = ParseKgDate(dateStr);
+            }
+            else if (trimmed.StartsWith("Record last updated", StringComparison.OrdinalIgnoreCase))
+            {
+                var dateStr = trimmed.Contains(":") ? trimmed[(trimmed.IndexOf(':') + 1)..].Trim() : trimmed;
+                response.Dates ??= new DomainDates();
+                response.Dates.Updated = ParseKgDate(dateStr);
+            }
+            else if (trimmed.StartsWith("Record expires", StringComparison.OrdinalIgnoreCase))
+            {
+                var dateStr = trimmed.Contains(":") ? trimmed[(trimmed.IndexOf(':') + 1)..].Trim() : trimmed;
+                response.Dates ??= new DomainDates();
+                response.Dates.Expires = ParseKgDate(dateStr);
+            }
+
+            // Nameservers
+            if (trimmed.Contains("Name servers", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Contains("Nameservers", StringComparison.OrdinalIgnoreCase))
+            {
+                inNameserverSection = true;
+                continue;
+            }
+
+            if (inNameserverSection && !string.IsNullOrEmpty(trimmed))
+            {
+                if (trimmed.Contains(':') || trimmed.Contains(' '))
+                {
+                    // Skip non-NS lines
+                    if (trimmed.StartsWith("NS", StringComparison.OrdinalIgnoreCase) ||
+                        trimmed.EndsWith(".COM", StringComparison.OrdinalIgnoreCase) ||
+                        trimmed.EndsWith(".NET", StringComparison.OrdinalIgnoreCase) ||
+                        trimmed.EndsWith(".ORG", StringComparison.OrdinalIgnoreCase))
+                    {
+                        nameServers.Add(trimmed.ToLowerInvariant());
+                    }
+                    else
+                    {
+                        inNameserverSection = false;
+                    }
+                }
+            }
+        }
+
+        response.Contacts = contacts;
+        response.NameServers = nameServers;
+        return response;
+    }
+
+    private static DateTime? ParseKgDate(string dateStr)
+    {
+        if (string.IsNullOrWhiteSpace(dateStr))
+            return null;
+
+        // Format: "Wed Feb 10 17:56:46 2021" or "Tue Feb  9 17:56:46 2027"
+        var formats = new[]
+        {
+            "ddd MMM d HH:mm:ss yyyy",
+            "ddd MMM dd HH:mm:ss yyyy",
+            "ddd MMM  d HH:mm:ss yyyy"
+        };
+
+        foreach (var format in formats)
+        {
+            if (DateTime.TryParseExact(dateStr.Trim(), format, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+                return date;
+        }
+
+        return DateTime.TryParse(dateStr, out var parsed) ? parsed : null;
     }
 }

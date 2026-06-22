@@ -67,8 +67,9 @@ public class WhoisLookup : IDisposable
         _rdapClient.OnRequest = (endpoint, success, error) =>
             trace.Add(new TraceEntry { Protocol = "RDAP", Endpoint = endpoint, Success = success, Error = error });
 
-        foreach (var step in steps)
+        for (int i = 0; i < steps.Length; i++)
         {
+            var step = steps[i];
             var result = step switch
             {
                 Steps.RdapTrad => await TryRdapTraditionalAsync(query, trace),
@@ -79,10 +80,42 @@ public class WhoisLookup : IDisposable
             };
 
             result.Trace = trace;
-            if (result.IsSuccessful) return result;
+            
+            if (result.IsSuccessful)
+            {
+                // For WHOIS with Traditional formatter, check if we should fallback to LLM
+                if (step == Steps.WhoisTrad && _llmFormatter != null && ShouldFallbackToLlm(result))
+                {
+                    trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = "Traditional", Success = true, Error = "Empty registrar/dates, falling back to LLM" });
+                    
+                    // Try LLM fallback
+                    var llmResult = await TryWhoisLlmAsync(query, trace);
+                    if (llmResult.IsSuccessful && !ShouldFallbackToLlm(llmResult))
+                    {
+                        llmResult.Trace = trace;
+                        return llmResult;
+                    }
+                }
+                
+                // Return the result even if incomplete (LLM not configured or LLM also failed)
+                return result;
+            }
         }
 
         return new QueryResult { IsSuccessful = false, ErrorMessage = "All query methods failed", Trace = trace };
+    }
+
+    private static bool ShouldFallbackToLlm(QueryResult result)
+    {
+        // Check if registrar is empty
+        var hasRegistrar = result.Data?.Registrar != null && 
+                           !string.IsNullOrEmpty(result.Data.Registrar.Name);
+        
+        // Check if expiration date is empty
+        var hasExpiration = result.Data?.Dates?.Expires != null;
+        
+        // Fallback if both are empty
+        return !hasRegistrar && !hasExpiration;
     }
 
     private async Task<QueryResult> TryRdapTraditionalAsync(string query, List<TraceEntry> trace)
