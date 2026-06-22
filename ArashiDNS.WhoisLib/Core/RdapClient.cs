@@ -132,7 +132,17 @@ public class RdapClient : IWhoisClient
                 {
                     if (link.TryGetProperty("rel", out var rel) && rel.GetString() == "related" &&
                         link.TryGetProperty("href", out var href))
+                    {
+                        // Check for application/rdap+json type (preferred)
+                        if (link.TryGetProperty("type", out var type))
+                        {
+                            var typeStr = type.GetString();
+                            if (!string.IsNullOrEmpty(typeStr) && typeStr.Contains("rdap+json"))
+                                return href.GetString();
+                        }
+                        // Fallback: accept any related link
                         return href.GetString();
+                    }
                 }
             }
         }

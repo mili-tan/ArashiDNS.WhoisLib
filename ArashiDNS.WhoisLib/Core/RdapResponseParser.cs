@@ -20,7 +20,9 @@ public class RdapResponseParser
             {
                 WhoisQueryType.Ipv4 or WhoisQueryType.Ipv6 => GetIpDomain(root, query),
                 WhoisQueryType.Asn => GetAsnDomain(root, query),
-                _ => GetStringProperty(root, "ldhName") ?? query
+                _ => GetStringProperty(root, "ldhName")
+                    ?? GetStringProperty(root, "unicodeName")
+                    ?? query
             };
 
             var contacts = new ContactCollection();
@@ -34,7 +36,7 @@ public class RdapResponseParser
                 RawResponse = rawJson,
                 Domain = domain,
                 IsSuccessful = true,
-                WhoisServer = endpoint,
+                WhoisServer = GetStringProperty(root, "port43") ?? endpoint,
                 Statuses = TryParse(() => ParseStatuses(root)) ?? [],
                 NameServers = TryParse(() => ParseNameservers(root)) ?? [],
                 Dates = TryParse(() => ParseDates(root)) ?? new DomainDates(),
@@ -193,7 +195,10 @@ public class RdapResponseParser
                     contacts.Admin = ParseContact(entity);
                 if (roles.Contains("technical") && contacts.Tech == null)
                     contacts.Tech = ParseContact(entity);
+                if (roles.Contains("billing") && contacts.Billing == null)
+                    contacts.Billing = ParseContact(entity);
 
+                // Recursive nested entities
                 if (entity.TryGetProperty("entities", out var nested) && nested.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var nestedEntity in nested.EnumerateArray())
@@ -206,6 +211,8 @@ public class RdapResponseParser
                             contacts.Admin = ParseContact(nestedEntity);
                         if (allRoles.Contains("technical") && contacts.Tech == null)
                             contacts.Tech = ParseContact(nestedEntity);
+                        if (allRoles.Contains("billing") && contacts.Billing == null)
+                            contacts.Billing = ParseContact(nestedEntity);
                     }
                 }
             }
@@ -220,7 +227,6 @@ public class RdapResponseParser
         if (entity.TryGetProperty("vcardArray", out var vcard))
         {
             registrar.Name = GetVcardValue(vcard, "fn") ?? "";
-            // If fn is empty, try org
             if (string.IsNullOrEmpty(registrar.Name))
                 registrar.Name = GetVcardValue(vcard, "org") ?? "";
         }
@@ -283,28 +289,130 @@ public class RdapResponseParser
         var contact = new ContactInfo();
         if (!entity.TryGetProperty("vcardArray", out var vcard)) return contact;
 
-        // Parse all fields
-        contact.Email = GetVcardPropertyValue(vcard, "email") ?? "";
-        contact.Organization = GetVcardValue(vcard, "org") ?? "";
-        contact.Name = GetVcardValue(vcard, "fn") ?? "";
-        contact.Phone = GetVcardPhone(vcard) ?? "";
-        contact.Street = GetVcardAddress(vcard, "street") ?? "";
-        contact.City = GetVcardAddress(vcard, "city") ?? "";
-        contact.State = GetVcardAddress(vcard, "region") ?? "";
-        contact.PostalCode = GetVcardAddress(vcard, "code") ?? "";
-        contact.Country = GetVcardAddress(vcard, "country") ?? "";
+        // Parse all vCard fields
+        var props = GetVcardProperties(vcard);
+        if (props == null) return contact;
 
-        // Fallback: if email is empty, try contact-uri
-        if (string.IsNullOrEmpty(contact.Email))
-            contact.Email = GetVcardPropertyValue(vcard, "contact-uri") ?? "";
+        foreach (var prop in props.Value.EnumerateArray())
+        {
+            try
+            {
+                if (prop.ValueKind != JsonValueKind.Array) continue;
+                var arr = prop.EnumerateArray().ToList();
+                if (arr.Count < 4 || arr[0].ValueKind != JsonValueKind.String) continue;
+
+                var type = arr[0].GetString()?.ToLowerInvariant();
+                if (string.IsNullOrEmpty(type) || type == "version" || type == "n") continue;
+
+                var value = arr[3];
+                var attrs = arr.Count > 1 && arr[1].ValueKind == JsonValueKind.Object ? arr[1] : default;
+
+                switch (type)
+                {
+                    case "fn":
+                        contact.Name = ExtractStringValue(value) ?? "";
+                        break;
+                    case "org":
+                        contact.Organization = ExtractStringValue(value) ?? "";
+                        break;
+                    case "email":
+                        contact.Email = ExtractStringValue(value) ?? "";
+                        break;
+                    case "contact-uri":
+                        if (string.IsNullOrEmpty(contact.Email))
+                            contact.Email = ExtractStringValue(value) ?? "";
+                        break;
+                    case "tel":
+                        var phoneValue = ExtractStringValue(value);
+                        if (phoneValue?.StartsWith("tel:") == true)
+                            phoneValue = phoneValue[4..];
+                        
+                        // Check for fax type
+                        var isFax = false;
+                        if (attrs.ValueKind == JsonValueKind.Object && 
+                            attrs.TryGetProperty("type", out var typeProp))
+                        {
+                            if (typeProp.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var t in typeProp.EnumerateArray())
+                                {
+                                    if (t.ValueKind == JsonValueKind.String && 
+                                        t.GetString()?.ToLowerInvariant() == "fax")
+                                    {
+                                        isFax = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            else if (typeProp.ValueKind == JsonValueKind.String && 
+                                     typeProp.GetString()?.ToLowerInvariant() == "fax")
+                            {
+                                isFax = true;
+                            }
+                        }
+                        
+                        // Keep first non-fax phone, or fax if that's all we have
+                        if (!isFax && string.IsNullOrEmpty(contact.Phone))
+                            contact.Phone = phoneValue ?? "";
+                        else if (isFax && string.IsNullOrEmpty(contact.Phone))
+                            contact.Phone = phoneValue ?? "";
+                        break;
+                    case "adr":
+                        // Check for label first (easier to parse)
+                        if (attrs.ValueKind == JsonValueKind.Object && 
+                            attrs.TryGetProperty("label", out var labelProp) &&
+                            labelProp.ValueKind == JsonValueKind.String)
+                        {
+                            var label = labelProp.GetString() ?? "";
+                            contact.Street = label;
+                        }
+                        else if (value.ValueKind == JsonValueKind.Array)
+                        {
+                            // Parse structured address
+                            var addrParts = value.EnumerateArray().ToList();
+                            // adr format: [pobox, ext, street, city, region, code, country]
+                            var streetParts = new List<string>();
+                            if (addrParts.Count > 0) streetParts.Add(ExtractStringValue(addrParts[0]) ?? ""); // pobox
+                            if (addrParts.Count > 1) streetParts.Add(ExtractStringValue(addrParts[1]) ?? ""); // ext
+                            if (addrParts.Count > 2) streetParts.Add(ExtractStringValue(addrParts[2]) ?? ""); // street
+                            contact.Street = string.Join(", ", streetParts.Where(s => !string.IsNullOrEmpty(s)));
+                            if (addrParts.Count > 3) contact.City = ExtractStringValue(addrParts[3]) ?? "";
+                            if (addrParts.Count > 4) contact.State = ExtractStringValue(addrParts[4]) ?? "";
+                            if (addrParts.Count > 5) contact.PostalCode = ExtractStringValue(addrParts[5]) ?? "";
+                            if (addrParts.Count > 6) contact.Country = ExtractStringValue(addrParts[6]) ?? "";
+                        }
+                        
+                        // Check for country code in attributes
+                        if (attrs.ValueKind == JsonValueKind.Object && 
+                            attrs.TryGetProperty("cc", out var ccProp) &&
+                            ccProp.ValueKind == JsonValueKind.String)
+                        {
+                            contact.Country = ccProp.GetString() ?? contact.Country;
+                        }
+                        break;
+                }
+            }
+            catch { }
+        }
 
         // Fallback: if name is empty, use org
         if (string.IsNullOrEmpty(contact.Name) && !string.IsNullOrEmpty(contact.Organization))
-        {
             contact.Name = contact.Organization;
-        }
 
         return contact;
+    }
+
+    private JsonElement? GetVcardProperties(JsonElement vcard)
+    {
+        try
+        {
+            if (vcard.ValueKind == JsonValueKind.Array && vcard.GetArrayLength() > 1)
+                return vcard[1];
+            if (vcard.TryGetProperty("value", out var val))
+                return val;
+        }
+        catch { }
+        return null;
     }
 
     private string? GetVcardValue(JsonElement vcard, string propertyName)
@@ -324,80 +432,6 @@ public class RdapResponseParser
                 if (string.Equals(name, propertyName, StringComparison.OrdinalIgnoreCase))
                     return ExtractStringValue(arr[3]);
             }
-        }
-        catch { }
-        return null;
-    }
-
-    private string? GetVcardPropertyValue(JsonElement vcard, string propertyName)
-    {
-        try
-        {
-            var props = GetVcardProperties(vcard);
-            if (props == null) return null;
-
-            foreach (var prop in props.Value.EnumerateArray())
-            {
-                if (prop.ValueKind != JsonValueKind.Array) continue;
-                var arr = prop.EnumerateArray().ToList();
-                if (arr.Count < 4 || arr[0].ValueKind != JsonValueKind.String) continue;
-
-                var name = arr[0].GetString();
-                if (string.Equals(name, propertyName, StringComparison.OrdinalIgnoreCase))
-                    return ExtractStringValue(arr[3]);
-            }
-        }
-        catch { }
-        return null;
-    }
-
-    private string? GetVcardPhone(JsonElement vcard)
-    {
-        var value = GetVcardPropertyValue(vcard, "tel");
-        return value?.StartsWith("tel:") == true ? value[4..] : value;
-    }
-
-    private string? GetVcardAddress(JsonElement vcard, string part)
-    {
-        try
-        {
-            var props = GetVcardProperties(vcard);
-            if (props == null) return null;
-
-            foreach (var prop in props.Value.EnumerateArray())
-            {
-                if (prop.ValueKind != JsonValueKind.Array) continue;
-                var arr = prop.EnumerateArray().ToList();
-                if (arr.Count < 4 || arr[0].ValueKind != JsonValueKind.String) continue;
-
-                var name = arr[0].GetString();
-                if (!string.Equals(name, "adr", StringComparison.OrdinalIgnoreCase)) continue;
-                if (arr[3].ValueKind != JsonValueKind.Array) continue;
-
-                var addrParts = arr[3].EnumerateArray().ToList();
-                return part.ToLowerInvariant() switch
-                {
-                    "street" => addrParts.Count > 2 ? ExtractStringValue(addrParts[2]) : null,
-                    "city" => addrParts.Count > 3 ? ExtractStringValue(addrParts[3]) : null,
-                    "region" => addrParts.Count > 4 ? ExtractStringValue(addrParts[4]) : null,
-                    "code" => addrParts.Count > 5 ? ExtractStringValue(addrParts[5]) : null,
-                    "country" => addrParts.Count > 6 ? ExtractStringValue(addrParts[6]) : null,
-                    _ => null
-                };
-            }
-        }
-        catch { }
-        return null;
-    }
-
-    private JsonElement? GetVcardProperties(JsonElement vcard)
-    {
-        try
-        {
-            if (vcard.ValueKind == JsonValueKind.Array && vcard.GetArrayLength() > 1)
-                return vcard[1];
-            if (vcard.TryGetProperty("value", out var val))
-                return val;
         }
         catch { }
         return null;
