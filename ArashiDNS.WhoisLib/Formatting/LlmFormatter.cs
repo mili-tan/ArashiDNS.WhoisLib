@@ -12,12 +12,7 @@ public class LlmFormatterOptions
     public string ApiEndpoint { get; set; } = "https://api.deepseek.com/chat/completions";
     public string Model { get; set; } = "deepseek-v4-flash";
     public string ApiKey { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// 思考模式开关：true=启用, false=禁用, null=不指定（使用API默认值）
-    /// </summary>
     public bool? EnableThinking { get; set; }
-    
     public string ReasoningEffort { get; set; } = "high";
     public float Temperature { get; set; } = 0.1f;
     public int MaxTokens { get; set; } = 4096;
@@ -40,7 +35,6 @@ public class LlmFormatter : IWhoisFormatter
 
         _httpClient = httpClient ?? new HttpClient();
         _httpClient.Timeout = TimeSpan.FromSeconds(120);
-
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -50,104 +44,79 @@ public class LlmFormatter : IWhoisFormatter
 
     public async Task<FormattedResult> FormatAsync(WhoisResponse response)
     {
-        var systemPrompt = _options.CustomSystemPrompt ?? Prompts.SystemPrompt;
-        var userPrompt = (_options.CustomJsonPrompt ?? Prompts.JsonFormatPrompt)
+        var prompt = (_options.CustomJsonPrompt ?? Prompts.JsonFormatPrompt)
             .Replace("{0}", response.RawResponse);
 
-        var aiResponse = await CallLlmApiAsync(systemPrompt, userPrompt);
+        var json = await CallApiAsync(prompt);
 
-        try
+        var result = TryDeserialize<FormattedResult>(json);
+        if (result != null)
         {
-            var result = JsonSerializer.Deserialize<FormattedResult>(aiResponse, _jsonOptions);
-            if (result != null)
-            {
-                result.RawJson = aiResponse;
-                return result;
-            }
+            result.RawJson = json;
+            return result;
         }
-        catch { }
 
-        return new FormattedResult
-        {
-            Domain = response.Domain,
-            RawJson = aiResponse
-        };
+        return new FormattedResult { Domain = response.Domain, RawJson = json };
     }
 
     public async Task<string> FormatAsEntityClassAsync(WhoisResponse response)
     {
-        var systemPrompt = _options.CustomSystemPrompt ?? Prompts.SystemPrompt;
-        var userPrompt = (_options.CustomEntityPrompt ?? Prompts.EntityFormatPrompt)
+        var prompt = (_options.CustomEntityPrompt ?? Prompts.EntityFormatPrompt)
             .Replace("{0}", response.RawResponse);
 
-        return await CallLlmApiAsync(systemPrompt, userPrompt);
+        return await CallApiAsync(prompt);
     }
 
-    private async Task<string> CallLlmApiAsync(string systemPrompt, string userPrompt)
+    private async Task<string> CallApiAsync(string userPrompt)
     {
-        var messages = new object[]
+        var systemPrompt = _options.CustomSystemPrompt ?? Prompts.SystemPrompt;
+
+        // Build request body
+        var body = new Dictionary<string, object?>
         {
-            new { role = "system", content = systemPrompt },
-            new { role = "user", content = userPrompt }
+            ["model"] = _options.Model,
+            ["messages"] = new[]
+            {
+                new { role = "system", content = systemPrompt },
+                new { role = "user", content = userPrompt }
+            },
+            ["max_tokens"] = _options.MaxTokens,
+            ["stream"] = false
         };
 
-        object requestBody;
+        // Add thinking config if specified
+        if (_options.EnableThinking.HasValue)
+        {
+            body["thinking"] = new { type = _options.EnableThinking.Value ? "enabled" : "disabled" };
 
-        if (_options.EnableThinking == true)
-        {
-            // Thinking enabled
-            requestBody = new
-            {
-                model = _options.Model,
-                messages,
-                thinking = new { type = "enabled" },
-                reasoning_effort = _options.ReasoningEffort,
-                temperature = _options.Temperature,
-                max_tokens = _options.MaxTokens,
-                stream = false
-            };
-        }
-        else if (_options.EnableThinking == false)
-        {
-            // Thinking disabled
-            requestBody = new
-            {
-                model = _options.Model,
-                messages,
-                thinking = new { type = "disabled" },
-                temperature = _options.Temperature,
-                max_tokens = _options.MaxTokens,
-                stream = false
-            };
+            if (_options.EnableThinking.Value)
+                body["reasoning_effort"] = _options.ReasoningEffort;
         }
         else
         {
-            // Thinking not specified (use API default)
-            requestBody = new
-            {
-                model = _options.Model,
-                messages,
-                temperature = _options.Temperature,
-                max_tokens = _options.MaxTokens,
-                stream = false
-            };
+            body["temperature"] = _options.Temperature;
         }
 
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, _options.ApiEndpoint);
-        httpRequest.Headers.Add("Authorization", $"Bearer {_options.ApiKey}");
-        httpRequest.Content = JsonContent.Create(requestBody, options: _jsonOptions);
+        using var request = new HttpRequestMessage(HttpMethod.Post, _options.ApiEndpoint);
+        request.Headers.Add("Authorization", $"Bearer {_options.ApiKey}");
+        request.Content = JsonContent.Create(body, options: _jsonOptions);
 
-        using var response = await _httpClient.SendAsync(httpRequest);
-        var responseJson = await response.Content.ReadAsStringAsync();
+        using var response = await _httpClient.SendAsync(request);
+        var json = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"LLM API returned {response.StatusCode}: {responseJson}");
+            throw new InvalidOperationException($"LLM API error {response.StatusCode}: {json}");
 
-        var apiResponse = JsonSerializer.Deserialize<LlmApiResponse>(responseJson, _jsonOptions);
-        return apiResponse?.Choices?.FirstOrDefault()?.Message?.Content ?? string.Empty;
+        return TryDeserialize<LlmResponse>(json)?.Choices?.FirstOrDefault()?.Message?.Content ?? string.Empty;
     }
 
-    private class LlmApiResponse
+    private T? TryDeserialize<T>(string json)
+    {
+        try { return JsonSerializer.Deserialize<T>(json, _jsonOptions); }
+        catch { return default; }
+    }
+
+    private class LlmResponse
     {
         [JsonPropertyName("choices")]
         public List<LlmChoice>? Choices { get; set; }
@@ -163,7 +132,5 @@ public class LlmFormatter : IWhoisFormatter
     {
         [JsonPropertyName("content")]
         public string? Content { get; set; }
-        [JsonPropertyName("reasoning_content")]
-        public string? ReasoningContent { get; set; }
     }
 }
