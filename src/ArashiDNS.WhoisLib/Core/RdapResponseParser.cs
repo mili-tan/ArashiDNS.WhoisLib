@@ -23,6 +23,10 @@ public class RdapResponseParser
                 _ => GetStringProperty(root, "ldhName") ?? query
             };
 
+            var contacts = new ContactCollection();
+            RegistrarInfo? registrar = null;
+            TryExecute(() => ParseEntities(root, contacts, r => registrar = r));
+
             return new WhoisResponse
             {
                 Query = query,
@@ -34,7 +38,8 @@ public class RdapResponseParser
                 Statuses = TryParse(() => ParseStatuses(root)) ?? [],
                 NameServers = TryParse(() => ParseNameservers(root)) ?? [],
                 Dates = TryParse(() => ParseDates(root)) ?? new DomainDates(),
-                Contacts = TryParse(() => ParseContacts(root)) ?? new ContactCollection()
+                Contacts = contacts,
+                Registrar = registrar
             };
         }
         catch (Exception ex)
@@ -54,6 +59,12 @@ public class RdapResponseParser
     {
         try { return parser(); }
         catch { return null; }
+    }
+
+    private void TryExecute(Action action)
+    {
+        try { action(); }
+        catch { }
     }
 
     private string? GetStringProperty(JsonElement element, string name)
@@ -159,21 +170,23 @@ public class RdapResponseParser
         return dates;
     }
 
-    private ContactCollection ParseContacts(JsonElement root)
+    private void ParseEntities(JsonElement root, ContactCollection contacts, Action<RegistrarInfo> onRegistrar)
     {
-        var contacts = new ContactCollection();
         if (!root.TryGetProperty("entities", out var entities) || entities.ValueKind != JsonValueKind.Array)
-            return contacts;
+            return;
 
         foreach (var entity in entities.EnumerateArray())
         {
             try
             {
                 var roles = ParseRoles(entity);
+
                 if (roles.Contains("registrar"))
                 {
-                    // 注册商信息由RegistryIdentifier处理
+                    var registrar = ParseRegistrarEntity(entity);
+                    if (registrar != null) onRegistrar(registrar);
                 }
+
                 if (roles.Contains("registrant") && contacts.Registrant == null)
                     contacts.Registrant = ParseContact(entity);
                 if (roles.Contains("administrative") && contacts.Admin == null)
@@ -198,7 +211,54 @@ public class RdapResponseParser
             }
             catch { }
         }
-        return contacts;
+    }
+
+    private RegistrarInfo? ParseRegistrarEntity(JsonElement entity)
+    {
+        var registrar = new RegistrarInfo();
+
+        if (entity.TryGetProperty("vcardArray", out var vcard))
+        {
+            registrar.Name = GetVcardValue(vcard, "fn") ?? "";
+            // If fn is empty, try org
+            if (string.IsNullOrEmpty(registrar.Name))
+                registrar.Name = GetVcardValue(vcard, "org") ?? "";
+        }
+
+        if (entity.TryGetProperty("handle", out var handle) && handle.ValueKind == JsonValueKind.String)
+        {
+            registrar.IanaId = handle.GetString() ?? "";
+        }
+
+        if (entity.TryGetProperty("publicIds", out var publicIds) && publicIds.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var pid in publicIds.EnumerateArray())
+            {
+                var pidType = GetStringProperty(pid, "type");
+                if (pidType == "IANA Registrar ID")
+                {
+                    registrar.IanaId = GetStringProperty(pid, "identifier") ?? registrar.IanaId;
+                    break;
+                }
+            }
+        }
+
+        if (entity.TryGetProperty("links", out var links) && links.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var link in links.EnumerateArray())
+            {
+                var rel = GetStringProperty(link, "rel");
+                if (rel == "about")
+                {
+                    registrar.Website = GetStringProperty(link, "href") ?? "";
+                    break;
+                }
+            }
+        }
+
+        return string.IsNullOrEmpty(registrar.Name) && string.IsNullOrEmpty(registrar.IanaId)
+            ? null
+            : registrar;
     }
 
     private List<string> ParseRoles(JsonElement entity)
