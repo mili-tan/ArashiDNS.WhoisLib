@@ -155,100 +155,103 @@ class Program
     static void OutputYaml(QueryResult result)
     {
         var data = result.Data;
-        var sb = new StringBuilder();
 
-        sb.AppendLine($"Domain: {EscapeYaml(data.Domain)}");
+        // Domain with highlight
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"Domain: {EscapeYaml(data.Domain)}");
+        Console.ResetColor();
 
         if (data.Registry?.Name is { Length: > 0 })
         {
-            sb.AppendLine("Registry:");
-            sb.AppendLine($"  Name: {EscapeYaml(data.Registry.Name)}");
+            Console.WriteLine("Registry:");
+            Console.WriteLine($"  Name: {EscapeYaml(data.Registry.Name)}");
             if (data.Registry.Website is { Length: > 0 })
-                sb.AppendLine($"  Website: {EscapeYaml(data.Registry.Website)}");
+                Console.WriteLine($"  Website: {EscapeYaml(data.Registry.Website)}");
             if (data.Registry.WhoisServer is { Length: > 0 })
-                sb.AppendLine($"  WhoisServer: {EscapeYaml(data.Registry.WhoisServer)}");
+                Console.WriteLine($"  WhoisServer: {EscapeYaml(data.Registry.WhoisServer)}");
         }
 
         if (data.Registrar?.Name is { Length: > 0 })
         {
-            sb.AppendLine("Registrar:");
-            sb.AppendLine($"  Name: {EscapeYaml(data.Registrar.Name)}");
+            Console.WriteLine("Registrar:");
+            Console.WriteLine($"  Name: {EscapeYaml(data.Registrar.Name)}");
             if (data.Registrar.IanaId is { Length: > 0 })
-                sb.AppendLine($"  IanaId: {EscapeYaml(data.Registrar.IanaId)}");
+                Console.WriteLine($"  IanaId: {EscapeYaml(data.Registrar.IanaId)}");
             if (data.Registrar.Website is { Length: > 0 })
-                sb.AppendLine($"  Website: {EscapeYaml(data.Registrar.Website)}");
+                Console.WriteLine($"  Website: {EscapeYaml(data.Registrar.Website)}");
         }
 
+        // Privacy with highlight
         if (data.Privacy?.IsPrivate == true)
         {
-            sb.AppendLine("Privacy:");
-            sb.AppendLine("  IsPrivate: true");
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("Privacy:");
+            Console.WriteLine("  IsPrivate: true");
             if (data.Privacy.Provider is { Length: > 0 })
-                sb.AppendLine($"  Provider: {EscapeYaml(data.Privacy.Provider)}");
+                Console.WriteLine($"  Provider: {EscapeYaml(data.Privacy.Provider)}");
+            Console.ResetColor();
         }
 
         if (data.Dates != null)
         {
-            sb.AppendLine("Dates:");
+            Console.WriteLine("Dates:");
             if (data.Dates.Created.HasValue)
-                sb.AppendLine($"  Created: {data.Dates.Created:yyyy-MM-dd}");
+                Console.WriteLine($"  Created: {data.Dates.Created:yyyy-MM-dd}");
             if (data.Dates.Updated.HasValue)
-                sb.AppendLine($"  Updated: {data.Dates.Updated:yyyy-MM-dd}");
+                Console.WriteLine($"  Updated: {data.Dates.Updated:yyyy-MM-dd}");
             if (data.Dates.Expires.HasValue)
-                sb.AppendLine($"  Expires: {data.Dates.Expires:yyyy-MM-dd}");
+                Console.WriteLine($"  Expires: {data.Dates.Expires:yyyy-MM-dd}");
         }
 
         if (data.Contacts.Count > 0)
         {
-            sb.AppendLine("Contacts:");
+            Console.WriteLine("Contacts:");
             foreach (var c in data.Contacts)
             {
-                sb.AppendLine($"  - Roles: [{string.Join(", ", c.Roles)}]");
-                if (c.Name is { Length: > 0 }) sb.AppendLine($"    Name: {EscapeYaml(c.Name)}");
-                if (c.Organization is { Length: > 0 }) sb.AppendLine($"    Organization: {EscapeYaml(c.Organization)}");
-                if (c.Email is { Length: > 0 }) sb.AppendLine($"    Email: {EscapeYaml(c.Email)}");
-                if (c.Phone is { Length: > 0 }) sb.AppendLine($"    Phone: {EscapeYaml(c.Phone)}");
-                if (c.Country is { Length: > 0 }) sb.AppendLine($"    Country: {EscapeYaml(c.Country)}");
+                Console.WriteLine($"  - Roles: [{string.Join(", ", c.Roles)}]");
+                if (c.Name is { Length: > 0 }) Console.WriteLine($"    Name: {EscapeYaml(c.Name)}");
+                if (c.Organization is { Length: > 0 }) Console.WriteLine($"    Organization: {EscapeYaml(c.Organization)}");
+                if (c.Email is { Length: > 0 }) Console.WriteLine($"    Email: {EscapeYaml(c.Email)}");
+                if (c.Phone is { Length: > 0 }) Console.WriteLine($"    Phone: {EscapeYaml(c.Phone)}");
+                if (c.Country is { Length: > 0 }) Console.WriteLine($"    Country: {EscapeYaml(c.Country)}");
             }
         }
 
         if (data.NameServers.Count > 0)
         {
-            sb.AppendLine("NameServers:");
+            Console.WriteLine("NameServers:");
             foreach (var ns in data.NameServers)
-                sb.AppendLine($"  - {EscapeYaml(ns)}");
+                Console.WriteLine($"  - {EscapeYaml(ns)}");
         }
 
         if (data.Statuses.Count > 0)
         {
-            sb.AppendLine("Status:");
+            Console.WriteLine("Status:");
             foreach (var s in data.Statuses)
-                sb.AppendLine($"  - {EscapeYaml(s)}");
+                Console.WriteLine($"  - {EscapeYaml(s)}");
         }
 
         if (data.Dnssec != null)
         {
-            sb.AppendLine("Dnssec:");
-            sb.AppendLine($"  Signed: {data.Dnssec.Signed.ToString().ToLower()}");
-            sb.AppendLine($"  DelegationSigned: {data.Dnssec.DelegationSigned.ToString().ToLower()}");
+            Console.WriteLine("Dnssec:");
+            Console.WriteLine($"  Signed: {data.Dnssec.Signed.ToString().ToLower()}");
+            Console.WriteLine($"  DelegationSigned: {data.Dnssec.DelegationSigned.ToString().ToLower()}");
             if (data.Dnssec.DsRecords.Count > 0)
             {
-                sb.AppendLine("  DsRecords:");
+                Console.WriteLine("  DsRecords:");
                 foreach (var ds in data.Dnssec.DsRecords)
                 {
-                    sb.AppendLine($"    - KeyTag: {ds.KeyTag}");
-                    sb.AppendLine($"      Algorithm: {ds.Algorithm}");
-                    sb.AppendLine($"      DigestType: {ds.DigestType}");
+                    Console.WriteLine($"    - KeyTag: {ds.KeyTag}");
+                    Console.WriteLine($"      Algorithm: {ds.Algorithm}");
+                    Console.WriteLine($"      DigestType: {ds.DigestType}");
                 }
             }
         }
 
-        sb.AppendLine("Meta:");
-        sb.AppendLine($"  Protocol: {EscapeYaml(result.UsedProtocol)}");
-        sb.AppendLine($"  Formatter: {EscapeYaml(result.UsedFormatter)}");
-        sb.AppendLine($"  Endpoint: {EscapeYaml(result.FinalEndpoint ?? "")}");
-
-        Console.WriteLine(sb.ToString());
+        Console.WriteLine("Meta:");
+        Console.WriteLine($"  Protocol: {EscapeYaml(result.UsedProtocol)}");
+        Console.WriteLine($"  Formatter: {EscapeYaml(result.UsedFormatter)}");
+        Console.WriteLine($"  Endpoint: {EscapeYaml(result.FinalEndpoint ?? "")}");
     }
 
     static string EscapeYaml(string value)
