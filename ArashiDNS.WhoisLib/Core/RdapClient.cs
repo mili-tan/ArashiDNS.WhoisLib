@@ -14,6 +14,8 @@ public class RdapClient : IWhoisClient
     private readonly RdapBootstrapProvider? _bootstrapProvider;
     private readonly RdapServerLookup _rdapLookup = new();
 
+    public Action<string, bool, string?>? OnRequest { get; set; }
+
     public RdapClient(HttpClient? httpClient = null, RdapBootstrapProvider? bootstrapProvider = null)
     {
         if (httpClient != null)
@@ -80,27 +82,31 @@ public class RdapClient : IWhoisClient
     {
         const int maxDepth = 3;
         if (depth >= maxDepth)
+        {
+            Report(endpoint, false, "Referral depth exceeded");
             return new WhoisResponse { Query = query, QueryType = queryType, IsSuccessful = false, ErrorMessage = "RDAP referral depth exceeded" };
+        }
 
         var (json, error) = await FetchRdapAsync(endpoint);
         if (json == null)
         {
+            Report(endpoint, false, error);
             return depth == 0
                 ? new WhoisResponse { Query = query, QueryType = queryType, IsSuccessful = false, ErrorMessage = error }
                 : new WhoisResponse { Query = query, QueryType = queryType, IsSuccessful = true, RawResponse = "", WhoisServer = endpoint };
         }
 
-        // Validate it's actual RDAP JSON
         if (!IsValidRdap(json))
         {
+            Report(endpoint, false, "Invalid RDAP response");
             return depth == 0
                 ? new WhoisResponse { Query = query, QueryType = queryType, IsSuccessful = false, ErrorMessage = "Invalid RDAP response" }
                 : new WhoisResponse { Query = query, QueryType = queryType, IsSuccessful = true, RawResponse = "", WhoisServer = endpoint };
         }
 
+        Report(endpoint, true);
         var result = _parser.Parse(query, queryType, json, endpoint);
 
-        // Try referral if needed
         if (result.IsSuccessful && depth < maxDepth && NeedsReferral(result))
         {
             var relatedLink = ExtractRelatedLink(json);
@@ -110,15 +116,18 @@ public class RdapClient : IWhoisClient
 
                 if (referralResult.IsSuccessful && HasUsefulData(referralResult))
                 {
-                    // Merge: registry dates/status + registrar contacts
                     MergeResults(result, referralResult);
-                    return result;
+                    return referralResult;
                 }
-                // Referral failed or no useful data - keep registry data
             }
         }
 
         return result;
+    }
+
+    private void Report(string endpoint, bool success, string? error = null)
+    {
+        OnRequest?.Invoke(endpoint, success, error);
     }
 
     private async Task<(string? json, string? error)> FetchRdapAsync(string endpoint)
@@ -145,7 +154,6 @@ public class RdapClient : IWhoisClient
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            // Check for anti-bot pages or invalid responses
             if (root.TryGetProperty("rgv587_flag", out _)) return false;
             if (root.TryGetProperty("url", out var urlProp))
             {
@@ -153,10 +161,9 @@ public class RdapClient : IWhoisClient
                 if (url != null && url.Contains("punish")) return false;
             }
 
-            // Must have either ldhName, objectClassName, or be an array
             if (root.TryGetProperty("ldhName", out _)) return true;
             if (root.TryGetProperty("objectClassName", out _)) return true;
-            if (root.TryGetProperty("errorCode", out _)) return true; // Error responses are valid RDAP
+            if (root.TryGetProperty("errorCode", out _)) return true;
 
             return false;
         }
@@ -168,13 +175,9 @@ public class RdapClient : IWhoisClient
 
     private static void MergeResults(WhoisResponse registryResult, WhoisResponse referralResult)
     {
-        // Keep registry dates (VeriSign has them, registrar may not)
         if (registryResult.Dates != null)
-        {
             referralResult.Dates = registryResult.Dates;
-        }
 
-        // Keep registry info
         referralResult.Registry = registryResult.Registry;
         referralResult.Domain = registryResult.Domain;
         referralResult.Statuses = registryResult.Statuses.Count > 0 ? registryResult.Statuses : referralResult.Statuses;
@@ -183,11 +186,16 @@ public class RdapClient : IWhoisClient
 
     private static bool HasUsefulData(WhoisResponse result)
     {
-        // Check if result has any useful contact info
         if (result.Contacts.Registrant != null)
         {
             var r = result.Contacts.Registrant;
             if (!string.IsNullOrEmpty(r.Name) || !string.IsNullOrEmpty(r.Organization) || !string.IsNullOrEmpty(r.Email))
+                return true;
+        }
+        if (result.Contacts.Tech != null)
+        {
+            var t = result.Contacts.Tech;
+            if (!string.IsNullOrEmpty(t.Name) || !string.IsNullOrEmpty(t.Organization) || !string.IsNullOrEmpty(t.Email))
                 return true;
         }
         return false;
@@ -222,13 +230,14 @@ public class RdapClient : IWhoisClient
 
     private static bool NeedsReferral(WhoisResponse result)
     {
-        if (result.Contacts.Registrant == null)
+        if (result.Contacts.Registrant == null && result.Contacts.Tech == null)
             return true;
 
         var r = result.Contacts.Registrant;
-        return string.IsNullOrEmpty(r.Name) &&
-               string.IsNullOrEmpty(r.Organization) &&
-               string.IsNullOrEmpty(r.Email);
+        if (r != null && string.IsNullOrEmpty(r.Name) && string.IsNullOrEmpty(r.Organization) && string.IsNullOrEmpty(r.Email))
+            return true;
+
+        return false;
     }
 
     private async Task<string?> GetRdapEndpointAsync(string query, WhoisQueryType queryType)

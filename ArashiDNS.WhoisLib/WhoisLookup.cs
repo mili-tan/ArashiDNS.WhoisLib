@@ -64,6 +64,8 @@ public class WhoisLookup : IDisposable
     private async Task<QueryResult> RunAsync(string query, params Steps[] steps)
     {
         var trace = new List<TraceEntry>();
+        _rdapClient.OnRequest = (endpoint, success, error) =>
+            trace.Add(new TraceEntry { Protocol = "RDAP", Endpoint = endpoint, Success = success, Error = error });
 
         foreach (var step in steps)
         {
@@ -88,15 +90,14 @@ public class WhoisLookup : IDisposable
         try
         {
             var response = await _rdapClient.QueryAsync(query);
-            var entry = new TraceEntry
+            trace.Add(new TraceEntry
             {
                 Protocol = "RDAP",
                 Endpoint = response.WhoisServer,
                 Formatter = "Traditional",
                 Success = response.IsSuccessful,
                 Error = response.ErrorMessage
-            };
-            trace.Add(entry);
+            });
 
             if (!response.IsSuccessful)
                 return new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage };
@@ -123,15 +124,17 @@ public class WhoisLookup : IDisposable
         try
         {
             var response = await _whoisClient.QueryAsync(query);
-            var entry = new TraceEntry
+
+            foreach (var server in response.ReferralChain)
             {
-                Protocol = "WHOIS",
-                Endpoint = response.WhoisServer,
-                Formatter = "Traditional",
-                Success = response.IsSuccessful,
-                Error = response.ErrorMessage
-            };
-            trace.Add(entry);
+                trace.Add(new TraceEntry
+                {
+                    Protocol = "WHOIS",
+                    Endpoint = server,
+                    Formatter = "Traditional",
+                    Success = true
+                });
+            }
 
             if (!response.IsSuccessful)
                 return new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage };
@@ -164,15 +167,14 @@ public class WhoisLookup : IDisposable
         try
         {
             var response = await _rdapClient.QueryAsync(query);
-            var entry = new TraceEntry
+            trace.Add(new TraceEntry
             {
                 Protocol = "RDAP",
                 Endpoint = response.WhoisServer,
                 Formatter = "LLM",
                 Success = response.IsSuccessful,
                 Error = response.ErrorMessage
-            };
-            trace.Add(entry);
+            });
 
             if (!response.IsSuccessful)
                 return new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage };
@@ -205,15 +207,17 @@ public class WhoisLookup : IDisposable
         try
         {
             var response = await _whoisClient.QueryAsync(query);
-            var entry = new TraceEntry
+
+            foreach (var server in response.ReferralChain)
             {
-                Protocol = "WHOIS",
-                Endpoint = response.WhoisServer,
-                Formatter = "LLM",
-                Success = response.IsSuccessful,
-                Error = response.ErrorMessage
-            };
-            trace.Add(entry);
+                trace.Add(new TraceEntry
+                {
+                    Protocol = "WHOIS",
+                    Endpoint = server,
+                    Formatter = "LLM",
+                    Success = true
+                });
+            }
 
             if (!response.IsSuccessful)
                 return new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage };
