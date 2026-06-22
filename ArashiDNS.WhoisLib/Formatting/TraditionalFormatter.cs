@@ -392,7 +392,7 @@ public class TraditionalFormatter : IWhoisFormatter
                 var parts = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length >= 2)
                 {
-                    response.Domain = parts[1].TrimEnd('.').ToUpperInvariant();
+                    response.Domain = parts[1].TrimEnd('.').ToLowerInvariant();
                     if (response.Domain.Contains('('))
                         response.Domain = response.Domain.Split('(')[0].Trim();
                 }

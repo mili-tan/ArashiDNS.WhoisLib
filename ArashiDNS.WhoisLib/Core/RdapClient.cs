@@ -300,7 +300,7 @@ public class RdapClient : IWhoisClient
     private string ConstructDomainUrl(string baseUrl, string domain)
     {
         if (!baseUrl.EndsWith('/')) baseUrl += '/';
-        return baseUrl + "domain/" + Uri.EscapeDataString(domain.ToUpperInvariant());
+        return baseUrl + "domain/" + Uri.EscapeDataString(domain.ToLowerInvariant());
     }
 
     private static string ExtractTld(string domain)
