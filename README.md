@@ -1,115 +1,136 @@
-# Whois.Lib
+# ArashiDNS WhoisLib
 
-A C# WHOIS lookup library that queries domain, IP, and ASN information with support for registry/registrar identification and AI-powered formatting.
+A C# WHOIS/RDAP lookup library with registry/registrar identification, privacy detection, and LLM-powered formatting.
 
 ## Features
 
-- **Three-level WHOIS server discovery**: Known list → DNS lookup → IANA query
-- **Registry (NIC) identification**: Automatic detection with official website
-- **Registrar identification**: Using IANA Registrar IDs database
-- **Privacy protection detection**: Identifies WHOIS privacy services
+- **WHOIS & RDAP support**: Query domain, IP, and ASN information
+- **Three-level server discovery**: Known list → DNS lookup → IANA query
+- **RDAP referral following**: Automatically follows registrar referrals
+- **Registry/Registrar identification**: With official websites from IANA data
+- **Privacy protection detection**: Identifies WHOIS privacy services and reasons
 - **Contact merging**: Merges identical contact info with role array
-- **AI formatting**: DeepSeek API integration for structured output
+- **LLM formatting**: DeepSeek API integration for structured output
+- **Auto fallback**: WHOIS Traditional → WHOIS LLM (when registrar/dates empty)
 - **Local file caching**: IANA data cached for 7 days
 
-## Project Structure
-
-```
-src/Whois.Lib/          # Core library
-samples/Whois.Demo/     # Demo CLI application
-```
-
-## Usage
-
-### CLI Demo
-
-```bash
-# Basic lookup
-dotnet run --project samples/Whois.Demo -- google.com
-
-# JSON output
-dotnet run --project samples/Whois.Demo -- google.com --json
-
-# AI-formatted output (requires DeepSeek API key)
-dotnet run --project samples/Whois.Demo -- google.com --ai sk-your-api-key
-
-# IP lookup
-dotnet run --project samples/Whois.Demo -- 8.8.8.8
-
-# ASN lookup
-dotnet run --project samples/Whois.Demo -- AS15169
-```
-
-### Library Usage
+## Quick Start
 
 ```csharp
-using Whois.Lib.Core;
-using Whois.Lib.Data;
-using Whois.Lib.Data.Cache;
-using Whois.Lib.Detection;
-using Whois.Lib.Formatting;
-using Whois.Lib.ServerDiscovery;
+using ArashiDNS.WhoisLib;
 
-// Initialize components
-var cache = new FileCacheProvider();
-var downloader = new IanaDataDownloader();
-var registrarProvider = new RegistrarListProvider(cache, downloader);
-var ipProvider = new IpAllocationProvider(cache, downloader);
+// Simple usage
+var result = await Whois.LookupAsync("google.com");
+Console.WriteLine(result.Data.Domain);
+Console.WriteLine(result.Data.Registrar?.Name);
 
-var serverFinder = new CompositeServerFinder(
-    new KnownServerLookup(),
-    new DnsServerLookup(),
-    new IanaServerLookup(),
-    ipProvider);
+// With options
+var options = new WhoisClientOptions
+{
+    Strategy = QueryStrategy.RdapFirst,
+    LlmApiKey = "sk-xxx"
+};
+var result = await Whois.LookupAsync("google.com", options);
+```
 
-var parser = new WhoisResponseParser();
-var client = new WhoisClient(serverFinder, parser);
+## CLI Usage
 
-// Query WHOIS
-var response = await client.QueryAsync("google.com");
+```bash
+# Basic lookup (RDAP → WHOIS → LLM fallback)
+ArashiDNS.WhoisDemo google.com
 
-// Detect privacy protection
-var privacyDetector = new PrivacyDetector();
-response.Privacy = privacyDetector.Detect(response);
+# RDAP only
+ArashiDNS.WhoisDemo google.com --rdap
 
-// Identify registry/registrar
-var registryIdentifier = new RegistryIdentifier(registrarProvider);
-response.Registry = await registryIdentifier.IdentifyRegistryAsync(response);
-response.Registrar = await registryIdentifier.IdentifyRegistrarAsync(response);
+# WHOIS only
+ArashiDNS.WhoisDemo google.com --whois
 
-// Get merged contacts
-var contacts = response.Contacts.GetMergedContacts();
+# With LLM formatting
+ArashiDNS.WhoisDemo google.com --llm
 
-// AI formatting (requires API key)
-var formatter = new DeepSeekFormatter("sk-your-api-key");
-var result = await formatter.FormatAsJsonAsync(response);
+# Trace mode (show each request step)
+ArashiDNS.WhoisDemo google.com -t
+
+# Show final endpoint
+ArashiDNS.WhoisDemo google.com --endpoint
+
+# JSON output
+ArashiDNS.WhoisDemo google.com --json
+```
+
+## Query Strategies
+
+| Strategy | Flow |
+|----------|------|
+| `RdapFirst` | RDAP+Traditional → WHOIS+Traditional → WHOIS+LLM |
+| `WhoisFirst` | WHOIS+Traditional → RDAP+Traditional → WHOIS+LLM |
+| `RdapFirstWhoisLlmFallback` | RDAP+Traditional → WHOIS+LLM |
+| `RdapTraditionOnly` | RDAP+Traditional only |
+| `WhoisTraditionOnly` | WHOIS+Traditional only |
+| `RdapLlmOnly` | RDAP+LLM only |
+| `WhoisLlmOnly` | WHOIS+LLM only |
+
+## LLM Configuration
+
+```csharp
+var options = new WhoisClientOptions
+{
+    LlmApiKey = "sk-xxx",                          // Or set DEEPSEEK_API_KEY env var
+    LlmModel = "deepseek-v4-flash",                // Default model
+    LlmApiEndpoint = "https://api.deepseek.com/...", // Custom endpoint
+    LlmEnableThinking = false                       // Enable thinking mode
+};
+```
+
+## Output Examples
+
+### RDAP Mode
+```
+Domain: GOOGLE.COM
+Registry: Verisign
+  Website: https://www.verisign.com
+Registrar: Markmonitor Inc.
+  IANA ID: 292
+Privacy: YES (GDPR Redaction)
+Dates:
+  Created: 1997-09-15
+  Expires: 2028-09-14
+Contacts:
+  [registrant]
+    Org: Google LLC
+```
+
+### Trace Mode (-t)
+```
+--- Trace ---
+  [OK] RDAP/ -> https://rdap.verisign.com/com/v1/domain/GOOGLE.COM
+  [OK] RDAP/ -> https://rdap.markmonitor.com/rdap/domain/GOOGLE.COM
+  [OK] RDAP/Traditional -> https://rdap.markmonitor.com/rdap/domain/GOOGLE.COM
 ```
 
 ## Data Sources
 
-| Data | Source | Cache Duration |
-|------|--------|----------------|
+| Data | Source | Cache |
+|------|--------|-------|
+| RDAP Endpoints | IANA RDAP Bootstrap (dns.json) | 7 days |
 | Registrar List | IANA Registrar IDs CSV | 7 days |
-| IPv4 Allocations | IANA IPv4 Address Space CSV | 7 days |
-| IPv6 Allocations | IANA IPv6 Unicast Address Assignments CSV | 7 days |
-| ASN Allocations | IANA AS Numbers CSV | 7 days |
-| TLD List | IANA TLD List | 7 days |
+| IPv4/IPv6 Allocations | IANA CSV | 7 days |
+| ASN Allocations | IANA CSV | 7 days |
+| Registry Info | tldlist.us | Built-in |
 
-## WHOIS Server Discovery
+## Project Structure
 
-1. **Known List**: Built-in list of ~50 common TLD WHOIS servers
-2. **DNS Lookup**: Queries `{tld}.whois-servers.net` DNS records
-3. **IANA WHOIS**: Falls back to querying `whois.iana.org`
+```
+ArashiDNS.WhoisLib/
+├── Contracts/          # Interfaces and models
+├── Core/               # WHOIS/RDAP clients and parsers
+├── Data/               # IANA data providers and cache
+├── Detection/          # Privacy and registry detection
+├── Formatting/         # Traditional and LLM formatters
+└── ServerDiscovery/    # Server lookup implementations
 
-## Privacy Detection
-
-Detects privacy services from major providers:
-- Domains By Proxy (GoDaddy)
-- WhoisGuard (Namecheap)
-- Contact Privacy (Google)
-- Withheld for Privacy (Namecheap)
-- Perfect Privacy (Network Solutions)
-- GDPR redaction patterns
+ArashiDNS.WhoisDemo/    # CLI demo application
+```
 
 ## License
 
