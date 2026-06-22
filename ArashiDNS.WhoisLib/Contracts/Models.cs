@@ -20,7 +20,6 @@ public class WhoisResponse
 {
     public string Query { get; set; } = string.Empty;
     public string Domain { get; set; } = string.Empty;
-    public string RawResponse { get; set; } = string.Empty;
     public WhoisQueryType QueryType { get; set; }
 
     public RegistryInfo? Registry { get; set; }
@@ -35,7 +34,7 @@ public class WhoisResponse
 
     public string WhoisServer { get; set; } = string.Empty;
     public string? Port43 { get; set; }
-    public string? RawWhoisResponse { get; set; }
+    public string? RawResponse { get; set; }
     public List<string> ReferralChain { get; set; } = new();
     public bool IsSuccessful { get; set; }
     public string? ErrorMessage { get; set; }

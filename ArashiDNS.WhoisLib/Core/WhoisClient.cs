@@ -108,7 +108,6 @@ public class WhoisClient : IWhoisClient
             Query = query,
             QueryType = queryType,
             RawResponse = rawResponse,
-            RawWhoisResponse = rawResponse,
             WhoisServer = server,
             ReferralChain = referralChain,
             IsSuccessful = true
