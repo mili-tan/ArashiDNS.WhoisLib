@@ -134,12 +134,23 @@ public class RdapClient : IWhoisClient
     {
         try
         {
-            var response = await _httpClient.GetAsync(endpoint);
+            // Use shorter timeout for rdap.org
+            var timeout = endpoint.Contains("rdap.org") 
+                ? TimeSpan.FromSeconds(3) 
+                : _httpClient.Timeout;
+
+            using var cts = new CancellationTokenSource(timeout);
+            var response = await _httpClient.GetAsync(endpoint, cts.Token);
+            
             if (!response.IsSuccessStatusCode)
                 return (null, $"RDAP query failed: {response.StatusCode}");
 
-            var json = await response.Content.ReadAsStringAsync();
+            var json = await response.Content.ReadAsStringAsync(cts.Token);
             return (json, null);
+        }
+        catch (OperationCanceledException)
+        {
+            return (null, "RDAP query timed out");
         }
         catch (Exception ex)
         {
