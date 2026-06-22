@@ -283,15 +283,27 @@ public class RdapResponseParser
         var contact = new ContactInfo();
         if (!entity.TryGetProperty("vcardArray", out var vcard)) return contact;
 
-        contact.Name = GetVcardValue(vcard, "fn") ?? "";
-        contact.Organization = GetVcardValue(vcard, "org") ?? "";
+        // Parse all fields
         contact.Email = GetVcardPropertyValue(vcard, "email") ?? "";
+        contact.Organization = GetVcardValue(vcard, "org") ?? "";
+        contact.Name = GetVcardValue(vcard, "fn") ?? "";
         contact.Phone = GetVcardPhone(vcard) ?? "";
         contact.Street = GetVcardAddress(vcard, "street") ?? "";
         contact.City = GetVcardAddress(vcard, "city") ?? "";
         contact.State = GetVcardAddress(vcard, "region") ?? "";
         contact.PostalCode = GetVcardAddress(vcard, "code") ?? "";
         contact.Country = GetVcardAddress(vcard, "country") ?? "";
+
+        // Fallback: if email is empty, try contact-uri
+        if (string.IsNullOrEmpty(contact.Email))
+            contact.Email = GetVcardPropertyValue(vcard, "contact-uri") ?? "";
+
+        // Fallback: if name is empty, use org
+        if (string.IsNullOrEmpty(contact.Name) && !string.IsNullOrEmpty(contact.Organization))
+        {
+            contact.Name = contact.Organization;
+        }
+
         return contact;
     }
 
