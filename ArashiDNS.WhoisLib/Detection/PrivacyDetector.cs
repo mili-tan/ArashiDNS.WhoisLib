@@ -91,8 +91,33 @@ public class PrivacyDetector
             indicators.Add($"Multiple redacted fields ({redactedCount})");
         }
 
+        // Check if contacts have no useful data (registrar doesn't provide info)
+        if (response.Contacts?.Registrant != null)
+        {
+            var r = response.Contacts.Registrant;
+            var hasAnyData = !string.IsNullOrEmpty(r.Name) ||
+                             !string.IsNullOrEmpty(r.Organization) ||
+                             (!string.IsNullOrEmpty(r.Email) && !r.Email.Contains("redacted", StringComparison.OrdinalIgnoreCase));
+
+            if (!hasAnyData)
+            {
+                indicators.Add("No registrant data provided");
+            }
+        }
+
         var isPrivate = indicators.Count > 0;
         var provider = DetectProvider(rawResponse);
+
+        // If private but no specific provider detected
+        if (isPrivate && string.IsNullOrEmpty(provider))
+        {
+            if (indicators.Any(i => i.Contains("redacted", StringComparison.OrdinalIgnoreCase)))
+                provider = "Redacted";
+            else if (indicators.Any(i => i.Contains("No registrant data")))
+                provider = "Registrar does not provide information";
+            else
+                provider = "Unknown privacy service";
+        }
 
         return new PrivacyInfo
         {
