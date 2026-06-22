@@ -67,8 +67,8 @@ public class WhoisClientOptions
     /// <summary>LLM API Key（默认从环境变量DEEPSEEK_API_KEY读取）</summary>
     public string? LlmApiKey { get; set; }
 
-    /// <summary>是否启用LLM思考模式</summary>
-    public bool LlmEnableThinking { get; set; }
+    /// <summary>是否启用LLM思考模式（true=启用, false=禁用, null=不指定）</summary>
+    public bool? LlmEnableThinking { get; set; }
 
     /// <summary>自定义缓存目录</summary>
     public string? CacheDirectory { get; set; }

@@ -12,8 +12,13 @@ public class LlmFormatterOptions
     public string ApiEndpoint { get; set; } = "https://api.deepseek.com/chat/completions";
     public string Model { get; set; } = "deepseek-v4-flash";
     public string ApiKey { get; set; } = string.Empty;
-    public bool EnableThinking { get; set; } = false;
-    public string ReasoningEffort { get; set; } = "medium";
+    
+    /// <summary>
+    /// 思考模式开关：true=启用, false=禁用, null=不指定（使用API默认值）
+    /// </summary>
+    public bool? EnableThinking { get; set; }
+    
+    public string ReasoningEffort { get; set; } = "high";
     public float Temperature { get; set; } = 0.1f;
     public int MaxTokens { get; set; } = 4096;
     public string? CustomSystemPrompt { get; set; }
@@ -86,23 +91,47 @@ public class LlmFormatter : IWhoisFormatter
             new { role = "user", content = userPrompt }
         };
 
-        object requestBody = _options.EnableThinking
-            ? new
+        object requestBody;
+
+        if (_options.EnableThinking == true)
+        {
+            // Thinking enabled
+            requestBody = new
             {
-                model = _options.Model, messages,
+                model = _options.Model,
+                messages,
                 thinking = new { type = "enabled" },
                 reasoning_effort = _options.ReasoningEffort,
                 temperature = _options.Temperature,
                 max_tokens = _options.MaxTokens,
                 stream = false
-            }
-            : new
+            };
+        }
+        else if (_options.EnableThinking == false)
+        {
+            // Thinking disabled
+            requestBody = new
             {
-                model = _options.Model, messages,
+                model = _options.Model,
+                messages,
+                thinking = new { type = "disabled" },
                 temperature = _options.Temperature,
                 max_tokens = _options.MaxTokens,
                 stream = false
             };
+        }
+        else
+        {
+            // Thinking not specified (use API default)
+            requestBody = new
+            {
+                model = _options.Model,
+                messages,
+                temperature = _options.Temperature,
+                max_tokens = _options.MaxTokens,
+                stream = false
+            };
+        }
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, _options.ApiEndpoint);
         httpRequest.Headers.Add("Authorization", $"Bearer {_options.ApiKey}");
