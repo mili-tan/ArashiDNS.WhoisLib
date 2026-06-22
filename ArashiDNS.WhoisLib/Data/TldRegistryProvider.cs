@@ -96,7 +96,7 @@ public class TldRegistryProvider
         
         // Identity Digital with WHOIS
         ["blog"] = new("Knock Knock WHOIS There (Automattic)", "https://www.blog", "whois.nic.blog"),
-        ["cloud"] = new("Aruba PEC", "https://www.cloud", "whois.nic.cloud"),
+        ["cloud"] = new("Aruba PEC", "https://www.cloud", "whois.nic.cloud", "https://rdap.registry.cloud/rdap/"),
         ["shop"] = new("GMO Registry", "https://www.shop", "whois.nic.shop"),
         ["ltd"] = new("Identity Digital", "https://www.ltd", "whois.nic.ltd"),
         ["group"] = new("Identity Digital", "https://www.group", "whois.nic.group"),
