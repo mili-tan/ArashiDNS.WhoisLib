@@ -87,39 +87,48 @@ public class TraditionalFormatter : IWhoisFormatter
 
     private async Task<FormattedResult> FormatDomainResponseAsync(WhoisResponse response)
     {
-        if (string.IsNullOrEmpty(response.Domain) && !string.IsNullOrEmpty(response.RawResponse))
+        try
         {
-            var fields = ExtractFields(response.RawResponse, DomainFieldMappings);
-            var parsed = ParseDomainResponse(fields, response.RawResponse);
-            
-            // Handle section-based WHOIS formats (like .kg)
-            if (string.IsNullOrEmpty(parsed.Domain) || 
-                (string.IsNullOrEmpty(parsed.Registrar?.Name) && parsed.Dates?.Expires == null))
+            if (string.IsNullOrEmpty(response.Domain) && !string.IsNullOrEmpty(response.RawResponse))
             {
-                var sectionParsed = ParseSectionBasedWhois(response.RawResponse);
-                if (!string.IsNullOrEmpty(sectionParsed.Domain))
-                    parsed.Domain = sectionParsed.Domain;
-                if (parsed.Dates?.Expires == null && sectionParsed.Dates?.Expires != null)
-                    parsed.Dates = sectionParsed.Dates;
-                if (string.IsNullOrEmpty(parsed.Registrar?.Name) && sectionParsed.Registrar != null)
-                    parsed.Registrar = sectionParsed.Registrar;
-                if (parsed.NameServers.Count == 0 && sectionParsed.NameServers.Count > 0)
-                    parsed.NameServers = sectionParsed.NameServers;
-                if (parsed.Contacts.Registrant == null && sectionParsed.Contacts.Registrant != null)
-                    parsed.Contacts = sectionParsed.Contacts;
+                var fields = ExtractFields(response.RawResponse, DomainFieldMappings);
+                var parsed = ParseDomainResponse(fields, response.RawResponse);
+                
+                // Handle section-based WHOIS formats (like .kg)
+                if (string.IsNullOrEmpty(parsed.Domain) || 
+                    (string.IsNullOrEmpty(parsed.Registrar?.Name) && parsed.Dates?.Expires == null))
+                {
+                    var sectionParsed = ParseSectionBasedWhois(response.RawResponse);
+                    if (!string.IsNullOrEmpty(sectionParsed.Domain))
+                        parsed.Domain = sectionParsed.Domain;
+                    if (parsed.Dates?.Expires == null && sectionParsed.Dates?.Expires != null)
+                        parsed.Dates = sectionParsed.Dates;
+                    if (string.IsNullOrEmpty(parsed.Registrar?.Name) && sectionParsed.Registrar != null)
+                        parsed.Registrar = sectionParsed.Registrar;
+                    if (parsed.NameServers.Count == 0 && sectionParsed.NameServers.Count > 0)
+                        parsed.NameServers = sectionParsed.NameServers;
+                    if (parsed.Contacts?.Registrant == null && sectionParsed.Contacts?.Registrant != null)
+                        parsed.Contacts = sectionParsed.Contacts;
+                }
+                
+                response.Domain = parsed.Domain ?? response.Query;
+                response.Dates = parsed.Dates;
+                response.NameServers = parsed.NameServers ?? new List<string>();
+                response.Statuses = parsed.Statuses ?? new List<string>();
+                response.Contacts = parsed.Contacts ?? new ContactCollection();
+                response.Registrar = parsed.Registrar;
+                response.Registry = parsed.Registry;
             }
-            
-            response.Domain = parsed.Domain;
-            response.Dates = parsed.Dates;
-            response.NameServers = parsed.NameServers;
-            response.Statuses = parsed.Statuses;
-            response.Contacts = parsed.Contacts;
-            response.Registrar = parsed.Registrar;
-            response.Registry = parsed.Registry;
+            else if (string.IsNullOrEmpty(response.Domain))
+            {
+                response.Domain = response.Query;
+            }
         }
-        else if (string.IsNullOrEmpty(response.Domain))
+        catch
         {
-            response.Domain = response.Query;
+            // If parsing fails, use query as domain
+            if (string.IsNullOrEmpty(response.Domain))
+                response.Domain = response.Query;
         }
 
         response.Privacy = _privacyDetector.Detect(response);
@@ -128,14 +137,14 @@ public class TraditionalFormatter : IWhoisFormatter
 
         return new FormattedResult
         {
-            Domain = response.Domain,
+            Domain = response.Domain ?? response.Query,
             Registry = response.Registry,
             Registrar = response.Registrar,
             Privacy = response.Privacy,
-            Contacts = response.Contacts.GetMergedContacts(),
+            Contacts = response.Contacts?.GetMergedContacts() ?? new List<ContactInfo>(),
             Dates = response.Dates,
-            NameServers = response.NameServers,
-            Statuses = response.Statuses,
+            NameServers = response.NameServers ?? new List<string>(),
+            Statuses = response.Statuses ?? new List<string>(),
             Dnssec = response.Dnssec
         };
     }

@@ -82,6 +82,17 @@ class Program
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"Error: {result.ErrorMessage}");
+            
+            // Show detailed failure reasons from trace
+            if (result.Trace.Count > 0)
+            {
+                Console.WriteLine("\nDetailed failures:");
+                foreach (var entry in result.Trace.Where(t => !t.Success))
+                {
+                    Console.WriteLine($"  - {entry.Protocol}/{entry.Formatter}: {entry.Error ?? "Unknown error"}");
+                }
+            }
+            
             Console.ResetColor();
             return;
         }
