@@ -10,9 +10,8 @@ public class FileCacheProvider : ICacheProvider
     public FileCacheProvider(string? cacheDirectory = null)
     {
         _cacheDirectory = cacheDirectory ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "WhoisLib",
-            "cache"
+            Directory.GetCurrentDirectory(),
+            ".WhoisLibCache"
         );
 
         _jsonOptions = new JsonSerializerOptions
