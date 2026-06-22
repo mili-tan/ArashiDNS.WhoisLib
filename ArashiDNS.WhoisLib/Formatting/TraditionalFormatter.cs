@@ -50,6 +50,7 @@ public class TraditionalFormatter : IWhoisFormatter
         ["tech_email"] = ["Tech Email:", "Technical Contact Email:"],
         ["tech_phone"] = ["Tech Phone:", "Technical Contact Phone:"],
         ["registry_domain_id"] = ["Registry Domain ID:", "Domain ID:", "ROID:"],
+        ["dnssec"] = ["DNSSEC:"],
     };
 
     private static readonly Dictionary<string, string[]> IpFieldMappings = new(StringComparer.OrdinalIgnoreCase)
@@ -116,7 +117,8 @@ public class TraditionalFormatter : IWhoisFormatter
             Contacts = response.Contacts.GetMergedContacts(),
             Dates = response.Dates,
             NameServers = response.NameServers,
-            Statuses = response.Statuses
+            Statuses = response.Statuses,
+            Dnssec = response.Dnssec
         };
     }
 
@@ -159,6 +161,7 @@ public class TraditionalFormatter : IWhoisFormatter
         response.NameServers = CleanFieldValues(GetFieldValues(fields, "nameserver"));
         response.Statuses = ParseStatuses(GetFieldValues(fields, "status"));
         response.Contacts = ParseContacts(fields);
+        response.Dnssec = ParseDnssec(fields);
         response.Registrar = new RegistrarInfo
         {
             Name = CleanFieldValue(GetFieldValue(fields, "registrar_name")),
@@ -287,6 +290,22 @@ public class TraditionalFormatter : IWhoisFormatter
             Registrant = ParseContact(fields, "registrant"),
             Admin = ParseContact(fields, "admin"),
             Tech = ParseContact(fields, "tech")
+        };
+    }
+
+    private static DnssecInfo? ParseDnssec(Dictionary<string, List<string>> fields)
+    {
+        var dnssecValue = CleanFieldValue(GetFieldValue(fields, "dnssec"));
+        if (string.IsNullOrEmpty(dnssecValue))
+            return null;
+
+        var signed = !dnssecValue.Contains("unsigned", StringComparison.OrdinalIgnoreCase) &&
+                     !dnssecValue.Equals("no", StringComparison.OrdinalIgnoreCase);
+
+        return new DnssecInfo
+        {
+            Signed = signed,
+            DelegationSigned = signed
         };
     }
 

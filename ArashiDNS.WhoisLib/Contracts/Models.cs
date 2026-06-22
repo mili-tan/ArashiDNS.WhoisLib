@@ -31,6 +31,7 @@ public class WhoisResponse
     public DomainDates? Dates { get; set; }
     public List<string> NameServers { get; set; } = new();
     public List<string> Statuses { get; set; } = new();
+    public DnssecInfo? Dnssec { get; set; }
 
     public string WhoisServer { get; set; } = string.Empty;
     public List<string> ReferralChain { get; set; } = new();
@@ -63,6 +64,9 @@ public class FormattedResult
 
     [JsonPropertyName("status")]
     public List<string> Statuses { get; set; } = new();
+
+    [JsonPropertyName("dnssec")]
+    public DnssecInfo? Dnssec { get; set; }
 
     [JsonIgnore]
     public string? RawJson { get; set; }
@@ -280,6 +284,58 @@ public class AsAllocation
     public string Description { get; set; } = string.Empty;
     public string WhoisServer { get; set; } = string.Empty;
     public string RdapUrl { get; set; } = string.Empty;
+}
+
+#endregion
+
+#region DNSSEC
+
+public class DnssecInfo
+{
+    [JsonPropertyName("signed")]
+    public bool Signed { get; set; }
+
+    [JsonPropertyName("delegationSigned")]
+    public bool DelegationSigned { get; set; }
+
+    [JsonPropertyName("maxSigLife")]
+    public int? MaxSigLife { get; set; }
+
+    [JsonPropertyName("dsData")]
+    public List<DsRecord> DsRecords { get; set; } = new();
+
+    [JsonPropertyName("keyData")]
+    public List<DnssecKey> KeyData { get; set; } = new();
+}
+
+public class DsRecord
+{
+    [JsonPropertyName("keyTag")]
+    public int KeyTag { get; set; }
+
+    [JsonPropertyName("algorithm")]
+    public int Algorithm { get; set; }
+
+    [JsonPropertyName("digestType")]
+    public int DigestType { get; set; }
+
+    [JsonPropertyName("digest")]
+    public string Digest { get; set; } = string.Empty;
+}
+
+public class DnssecKey
+{
+    [JsonPropertyName("flags")]
+    public int Flags { get; set; }
+
+    [JsonPropertyName("protocol")]
+    public int Protocol { get; set; }
+
+    [JsonPropertyName("algorithm")]
+    public int Algorithm { get; set; }
+
+    [JsonPropertyName("publicKey")]
+    public string PublicKey { get; set; } = string.Empty;
 }
 
 #endregion

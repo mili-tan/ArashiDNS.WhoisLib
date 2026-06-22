@@ -12,7 +12,8 @@ Rules:
 5. Return empty strings for missing fields, never null
 6. Dates should be in ISO 8601 format (yyyy-MM-dd)
 7. Status values should be lowercase with no URL prefixes
-8. Name servers should be lowercase";
+8. Name servers should be lowercase
+9. Extract DNSSEC information if available (signed, delegationSigned, dsData, keyData)";
 
     public const string JsonFormatPrompt = @"Parse the following WHOIS data into the specified JSON format.
 
@@ -54,7 +55,19 @@ Output JSON schema:
     ""expires"": ""yyyy-MM-dd""
   },
   ""nameServers"": [""string""],
-  ""status"": [""string""]
+  ""status"": [""string""],
+  ""dnssec"": {
+    ""signed"": boolean,
+    ""delegationSigned"": boolean,
+    ""dsRecords"": [
+      {
+        ""keyTag"": number,
+        ""algorithm"": number,
+        ""digestType"": number,
+        ""digest"": ""string""
+      }
+    ]
+  }
 }
 
 WHOIS Raw Data:

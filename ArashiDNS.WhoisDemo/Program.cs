@@ -145,6 +145,20 @@ class Program
             Console.WriteLine("\nName Servers:");
             foreach (var ns in data.NameServers) Console.WriteLine($"  - {ns}");
         }
+
+        if (data.Dnssec != null)
+        {
+            Console.WriteLine("\nDNSSEC:");
+            Console.WriteLine($"  Signed: {(data.Dnssec.Signed ? "Yes" : "No")}");
+            Console.WriteLine($"  Delegation Signed: {(data.Dnssec.DelegationSigned ? "Yes" : "No")}");
+            
+            if (data.Dnssec.DsRecords.Count > 0)
+            {
+                Console.WriteLine("  DS Records:");
+                foreach (var ds in data.Dnssec.DsRecords)
+                    Console.WriteLine($"    KeyTag={ds.KeyTag}, Algorithm={ds.Algorithm}, DigestType={ds.DigestType}");
+            }
+        }
     }
 
     static void OutputJson(QueryResult result)
@@ -159,6 +173,7 @@ class Program
             Contacts = result.Data.Contacts,
             result.Data.NameServers,
             result.Data.Statuses,
+            result.Data.Dnssec,
             Meta = new { result.UsedProtocol, result.UsedFormatter }
         };
 

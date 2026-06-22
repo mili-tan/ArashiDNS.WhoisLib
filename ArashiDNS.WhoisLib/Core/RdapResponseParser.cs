@@ -28,7 +28,8 @@ public class RdapResponseParser
                 NameServers = ParseNameservers(root),
                 Dates = ParseDates(root),
                 Contacts = ParseContacts(root, out var registrar),
-                Registrar = registrar
+                Registrar = registrar,
+                Dnssec = ParseDnssec(root)
             };
         }
         catch (Exception ex)
@@ -143,6 +144,55 @@ public class RdapResponseParser
             }
         }
         return dates;
+    }
+
+    private DnssecInfo? ParseDnssec(JsonElement root)
+    {
+        if (!root.TryGetProperty("secureDNS", out var secureDns))
+            return null;
+
+        var dnssec = new DnssecInfo
+        {
+            Signed = GetBool(secureDns, "zoneSigned"),
+            DelegationSigned = GetBool(secureDns, "delegationSigned"),
+            MaxSigLife = GetInt(secureDns, "maxSigLife")
+        };
+
+        // Parse DS records
+        if (secureDns.TryGetProperty("dsData", out var dsData) && dsData.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var ds in dsData.EnumerateArray())
+            {
+                dnssec.DsRecords.Add(new DsRecord
+                {
+                    KeyTag = GetInt(ds, "keyTag") ?? 0,
+                    Algorithm = GetInt(ds, "algorithm") ?? 0,
+                    DigestType = GetInt(ds, "digestType") ?? 0,
+                    Digest = GetString(ds, "digest") ?? ""
+                });
+            }
+        }
+
+        // Parse DNSKEY records
+        if (secureDns.TryGetProperty("keyData", out var keyData) && keyData.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var key in keyData.EnumerateArray())
+            {
+                dnssec.KeyData.Add(new DnssecKey
+                {
+                    Flags = GetInt(key, "flags") ?? 0,
+                    Protocol = GetInt(key, "protocol") ?? 0,
+                    Algorithm = GetInt(key, "algorithm") ?? 0,
+                    PublicKey = GetString(key, "publicKey") ?? ""
+                });
+            }
+        }
+
+        // Only return if there's actual data
+        if (!dnssec.Signed && !dnssec.DelegationSigned && dnssec.DsRecords.Count == 0 && dnssec.KeyData.Count == 0)
+            return null;
+
+        return dnssec;
     }
 
     #endregion
@@ -424,6 +474,23 @@ public class RdapResponseParser
         {
             var value = prop.GetString();
             return string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+        return null;
+    }
+
+    private bool GetBool(JsonElement element, string name)
+    {
+        if (element.TryGetProperty(name, out var prop) && prop.ValueKind == JsonValueKind.True)
+            return true;
+        return false;
+    }
+
+    private int? GetInt(JsonElement element, string name)
+    {
+        if (element.TryGetProperty(name, out var prop) && prop.ValueKind == JsonValueKind.Number)
+        {
+            if (prop.TryGetInt32(out var value))
+                return value;
         }
         return null;
     }
