@@ -30,7 +30,7 @@ public class RdapClient : IWhoisClient
                 AllowAutoRedirect = true,
                 MaxAutomaticRedirections = 5
             };
-            _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
+            _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
         }
 
         _httpClient.DefaultRequestHeaders.Add("Accept", "application/rdap+json");
