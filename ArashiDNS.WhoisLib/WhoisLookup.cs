@@ -24,13 +24,14 @@ public class WhoisLookup : IDisposable
         var downloader = new IanaDataDownloader(userAgent: _options.UserAgent);
         var registrarProvider = new RegistrarListProvider(cache, downloader);
         var ipProvider = new IpAllocationProvider(cache, downloader);
+        var rdapBootstrap = new RdapBootstrapProvider(cache, userAgent: _options.UserAgent);
 
         var serverFinder = new CompositeServerFinder(
             new KnownServerLookup(), new DnsServerLookup(),
             new IanaServerLookup(), ipProvider);
 
         _whoisClient = new WhoisClient(serverFinder);
-        _rdapClient = new RdapClient(userAgent: _options.UserAgent);
+        _rdapClient = new RdapClient(bootstrapProvider: rdapBootstrap, userAgent: _options.UserAgent);
         _traditionalFormatter = new TraditionalFormatter(registrarProvider);
 
         var apiKey = _options.LlmApiKey ?? Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
