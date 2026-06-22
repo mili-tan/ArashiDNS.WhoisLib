@@ -1,11 +1,6 @@
 using System.Text.Json;
-using ArashiDNS.WhoisLib.Contracts;
+using ArashiDNS.WhoisLib;
 using ArashiDNS.WhoisLib.Contracts.Models;
-using ArashiDNS.WhoisLib.Core;
-using ArashiDNS.WhoisLib.Data;
-using ArashiDNS.WhoisLib.Data.Cache;
-using ArashiDNS.WhoisLib.Formatting;
-using ArashiDNS.WhoisLib.ServerDiscovery;
 
 namespace ArashiDNS.WhoisDemo;
 
@@ -25,193 +20,152 @@ class Program
         var query = args[0];
         var outputJson = args.Contains("--json");
         var useRdap = args.Contains("--rdap");
+        var useWhois = args.Contains("--whois");
+        var useLlm = args.Contains("--llm");
         var enableThinking = args.Contains("--think");
         string? apiKey = null;
         string? model = null;
-        string? apiEndpoint = null;
 
         for (int i = 1; i < args.Length; i++)
         {
-            switch (args[i])
-            {
-                case "--llm" or "--ai":
-                    if (i + 1 < args.Length) apiKey = args[++i];
-                    break;
-                case "--model":
-                    if (i + 1 < args.Length) model = args[++i];
-                    break;
-                case "--endpoint":
-                    if (i + 1 < args.Length) apiEndpoint = args[++i];
-                    break;
-            }
+            if (args[i] == "--api-key" && i + 1 < args.Length)
+                apiKey = args[++i];
+            if (args[i] == "--model" && i + 1 < args.Length)
+                model = args[++i];
         }
 
-        try
+        var options = new WhoisClientOptions
         {
-            var cache = new FileCacheProvider();
-            var downloader = new IanaDataDownloader();
-            var registrarProvider = new RegistrarListProvider(cache, downloader);
-            var ipProvider = new IpAllocationProvider(cache, downloader);
+            Strategy = QueryStrategy.RdapFirst,
+            LlmApiKey = apiKey,
+            LlmModel = model,
+            LlmEnableThinking = enableThinking
+        };
 
-            var knownLookup = new KnownServerLookup();
-            var dnsLookup = new DnsServerLookup();
-            var ianaLookup = new IanaServerLookup();
+        if (useRdap) options.Strategy = QueryStrategy.RdapOnly;
+        else if (useWhois) options.Strategy = QueryStrategy.WhoisOnly;
+        else if (useLlm) options.Strategy = QueryStrategy.LlmOnly;
 
-            var serverFinder = new CompositeServerFinder(knownLookup, dnsLookup, ianaLookup, ipProvider);
-            var whoisClient = new WhoisClient(serverFinder);
-            var rdapClient = new RdapClient();
+        Console.WriteLine($"Querying: {query}\n");
 
-            Console.WriteLine($"Querying: {query} (Protocol: {(useRdap ? "RDAP" : "WHOIS")})\n");
+        var result = await Whois.LookupAsync(query, options);
 
-            WhoisResponse response;
-            if (useRdap)
-            {
-                response = await rdapClient.QueryAsync(query);
-            }
-            else
-            {
-                response = await whoisClient.QueryAsync(query);
-                if (!response.IsSuccessful)
-                {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"WHOIS failed: {response.ErrorMessage}");
-                    Console.WriteLine("Trying RDAP...\n");
-                    Console.ResetColor();
-                    response = await rdapClient.QueryAsync(query);
-                }
-            }
-
-            if (!response.IsSuccessful)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Error: {response.ErrorMessage}");
-                Console.ResetColor();
-                return;
-            }
-
-            IWhoisFormatter formatter;
-            if (!string.IsNullOrEmpty(apiKey))
-            {
-                var options = new LlmFormatterOptions
-                {
-                    ApiKey = apiKey,
-                    EnableThinking = enableThinking
-                };
-                if (!string.IsNullOrEmpty(model)) options.Model = model;
-                if (!string.IsNullOrEmpty(apiEndpoint)) options.ApiEndpoint = apiEndpoint;
-                formatter = new LlmFormatter(options);
-            }
-            else
-            {
-                formatter = new TraditionalFormatter(registrarProvider);
-            }
-
-            var result = await formatter.FormatAsync(response);
-
-            if (outputJson || !string.IsNullOrEmpty(apiKey))
-                OutputJson(result);
-            else
-                OutputFormatted(result, response);
-        }
-        catch (Exception ex)
+        if (!result.IsSuccessful)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"Fatal error: {ex.Message}");
+            Console.WriteLine($"Error: {result.ErrorMessage}");
             Console.ResetColor();
+            return;
         }
+
+        Console.ForegroundColor = ConsoleColor.Gray;
+        Console.WriteLine($"Protocol: {result.UsedProtocol} | Formatter: {result.UsedFormatter}");
+        Console.ResetColor();
+
+        if (outputJson)
+            OutputJson(result);
+        else
+            OutputFormatted(result);
     }
 
     static void PrintUsage()
     {
-        Console.WriteLine("Usage: whois-demo <domain|ip|asn> [options]");
+        Console.WriteLine("Usage: whois-demo <query> [options]");
+        Console.WriteLine("\nQuery: domain, IP address, or ASN");
         Console.WriteLine("\nOptions:");
-        Console.WriteLine("  --json              Output as JSON");
-        Console.WriteLine("  --rdap              Use RDAP protocol");
-        Console.WriteLine("  --llm <api-key>     Use LLM for formatting");
-        Console.WriteLine("  --model <name>      LLM model (default: deepseek-v4-flash)");
-        Console.WriteLine("  --endpoint <url>    LLM API endpoint");
-        Console.WriteLine("  --think             Enable LLM thinking mode");
+        Console.WriteLine("  --json          Output as JSON");
+        Console.WriteLine("  --rdap          Use RDAP only");
+        Console.WriteLine("  --whois         Use WHOIS only");
+        Console.WriteLine("  --llm           Use LLM formatter");
+        Console.WriteLine("  --api-key KEY   DeepSeek API key");
+        Console.WriteLine("  --model NAME    LLM model name");
+        Console.WriteLine("  --think         Enable LLM thinking");
         Console.WriteLine("\nExamples:");
         Console.WriteLine("  whois-demo google.com");
-        Console.WriteLine("  whois-demo google.com --rdap");
-        Console.WriteLine("  whois-demo google.com --json");
-        Console.WriteLine("  whois-demo google.com --llm sk-xxx");
+        Console.WriteLine("  whois-demo 8.8.8.8 --json");
+        Console.WriteLine("  whois-demo baidu.com --llm");
     }
 
-    static void OutputFormatted(FormattedResult result, WhoisResponse response)
+    static void OutputFormatted(QueryResult result)
     {
+        var data = result.Data;
+
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"Domain: {result.Domain}");
+        Console.WriteLine($"\nDomain: {data.Domain}");
         Console.ResetColor();
 
-        if (result.Registry?.Name is { Length: > 0 })
+        if (data.Registry?.Name is { Length: > 0 })
         {
-            Console.WriteLine($"\nRegistry: {result.Registry.Name}");
-            if (result.Registry.Website is { Length: > 0 }) Console.WriteLine($"  Website: {result.Registry.Website}");
-            if (result.Registry.WhoisServer is { Length: > 0 }) Console.WriteLine($"  WHOIS Server: {result.Registry.WhoisServer}");
+            Console.WriteLine($"\nRegistry: {data.Registry.Name}");
+            if (data.Registry.Website is { Length: > 0 })
+                Console.WriteLine($"  Website: {data.Registry.Website}");
         }
 
-        if (result.Registrar?.Name is { Length: > 0 })
+        if (data.Registrar?.Name is { Length: > 0 })
         {
-            Console.WriteLine($"\nRegistrar: {result.Registrar.Name}");
-            if (result.Registrar.IanaId is { Length: > 0 }) Console.WriteLine($"  IANA ID: {result.Registrar.IanaId}");
-            if (result.Registrar.Website is { Length: > 0 }) Console.WriteLine($"  Website: {result.Registrar.Website}");
+            Console.WriteLine($"\nRegistrar: {data.Registrar.Name}");
+            if (data.Registrar.IanaId is { Length: > 0 })
+                Console.WriteLine($"  IANA ID: {data.Registrar.IanaId}");
+            if (data.Registrar.Website is { Length: > 0 })
+                Console.WriteLine($"  Website: {data.Registrar.Website}");
         }
 
-        if (result.Privacy?.IsPrivate == true)
+        if (data.Privacy?.IsPrivate == true)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"\nPrivacy Protection: YES");
-            if (result.Privacy.Provider is { Length: > 0 }) Console.WriteLine($"  Provider: {result.Privacy.Provider}");
+            Console.WriteLine($"\nPrivacy: YES ({data.Privacy.Provider})");
             Console.ResetColor();
         }
 
-        if (result.Dates != null)
+        if (data.Dates != null)
         {
             Console.WriteLine("\nDates:");
-            if (result.Dates.Created.HasValue) Console.WriteLine($"  Created: {result.Dates.Created:yyyy-MM-dd}");
-            if (result.Dates.Updated.HasValue) Console.WriteLine($"  Updated: {result.Dates.Updated:yyyy-MM-dd}");
-            if (result.Dates.Expires.HasValue) Console.WriteLine($"  Expires: {result.Dates.Expires:yyyy-MM-dd}");
+            if (data.Dates.Created.HasValue)
+                Console.WriteLine($"  Created: {data.Dates.Created:yyyy-MM-dd}");
+            if (data.Dates.Updated.HasValue)
+                Console.WriteLine($"  Updated: {data.Dates.Updated:yyyy-MM-dd}");
+            if (data.Dates.Expires.HasValue)
+                Console.WriteLine($"  Expires: {data.Dates.Expires:yyyy-MM-dd}");
         }
 
-        if (result.Contacts.Count > 0)
+        if (data.Contacts.Count > 0)
         {
             Console.WriteLine("\nContacts:");
-            foreach (var contact in result.Contacts)
+            foreach (var c in data.Contacts)
             {
-                Console.WriteLine($"  [{string.Join(", ", contact.Roles)}]");
-                if (contact.Name is { Length: > 0 }) Console.WriteLine($"    Name: {contact.Name}");
-                if (contact.Organization is { Length: > 0 }) Console.WriteLine($"    Org: {contact.Organization}");
-                if (contact.Email is { Length: > 0 }) Console.WriteLine($"    Email: {contact.Email}");
-                if (contact.Country is { Length: > 0 }) Console.WriteLine($"    Country: {contact.Country}");
+                Console.WriteLine($"  [{string.Join(", ", c.Roles)}]");
+                if (c.Name is { Length: > 0 }) Console.WriteLine($"    Name: {c.Name}");
+                if (c.Organization is { Length: > 0 }) Console.WriteLine($"    Org: {c.Organization}");
+                if (c.Email is { Length: > 0 }) Console.WriteLine($"    Email: {c.Email}");
             }
         }
 
-        if (result.NameServers.Count > 0)
+        if (data.NameServers.Count > 0)
         {
             Console.WriteLine("\nName Servers:");
-            foreach (var ns in result.NameServers) Console.WriteLine($"  - {ns}");
+            foreach (var ns in data.NameServers) Console.WriteLine($"  - {ns}");
         }
-
-        Console.WriteLine($"\nQuery Details:");
-        Console.WriteLine($"  Server: {response.WhoisServer}");
-        if (response.ReferralChain.Count > 1)
-            Console.WriteLine($"  Chain: {string.Join(" -> ", response.ReferralChain)}");
     }
 
-    static void OutputJson(FormattedResult result)
+    static void OutputJson(QueryResult result)
     {
-        var json = result.RawJson ?? JsonSerializer.Serialize(result, new JsonSerializerOptions
+        var output = new
+        {
+            result.Data.Domain,
+            result.Data.Registry,
+            result.Data.Registrar,
+            result.Data.Privacy,
+            result.Data.Dates,
+            Contacts = result.Data.Contacts,
+            result.Data.NameServers,
+            result.Data.Statuses,
+            Meta = new { result.UsedProtocol, result.UsedFormatter }
+        };
+
+        Console.WriteLine(JsonSerializer.Serialize(output, new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
-
-        try
-        {
-            var jsonDoc = JsonDocument.Parse(json);
-            Console.WriteLine(JsonSerializer.Serialize(jsonDoc, new JsonSerializerOptions { WriteIndented = true }));
-        }
-        catch { Console.WriteLine(json); }
+        }));
     }
 }
