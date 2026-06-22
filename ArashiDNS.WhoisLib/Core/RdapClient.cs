@@ -101,7 +101,8 @@ public class RdapClient : IWhoisClient
         var json = await response.Content.ReadAsStringAsync();
         var result = _parser.Parse(query, queryType, json, endpoint);
 
-        if (result.IsSuccessful && result.Contacts.Registrant == null && depth < maxDepth)
+        // Follow referral if registrant has no useful data
+        if (result.IsSuccessful && depth < maxDepth && NeedsReferral(result))
         {
             var relatedLink = ExtractRelatedLink(json);
             if (!string.IsNullOrEmpty(relatedLink))
@@ -109,6 +110,7 @@ public class RdapClient : IWhoisClient
                 var referralResult = await QueryWithReferralAsync(query, queryType, relatedLink, depth + 1);
                 if (referralResult.IsSuccessful)
                 {
+                    // Merge: keep registry from current, use referral's contacts
                     referralResult.Registry = result.Registry;
                     referralResult.Domain = result.Domain;
                     return referralResult;
@@ -136,6 +138,22 @@ public class RdapClient : IWhoisClient
         }
         catch { }
         return null;
+    }
+
+    private static bool NeedsReferral(WhoisResponse result)
+    {
+        // Follow referral if no registrant at all
+        if (result.Contacts.Registrant == null)
+            return true;
+
+        // Follow referral if registrant has no useful data
+        var r = result.Contacts.Registrant;
+        if (string.IsNullOrEmpty(r.Name) &&
+            string.IsNullOrEmpty(r.Organization) &&
+            string.IsNullOrEmpty(r.Email))
+            return true;
+
+        return false;
     }
 
     private async Task<string?> GetRdapEndpointAsync(string query, WhoisQueryType queryType)
