@@ -130,21 +130,21 @@ class Program
     static void OutputYamlTrace(List<TraceEntry> trace)
     {
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine("--- Trace ---");
+        Console.WriteLine("Trace:");
         foreach (var entry in trace)
         {
             var status = entry.Success ? "OK" : "FAIL";
             var color = entry.Success ? ConsoleColor.Green : ConsoleColor.Red;
             Console.ForegroundColor = color;
-            Console.Write($"  [{status}]");
+            Console.Write($"  - Status: {status}");
             Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.Write($" {entry.Protocol}/{entry.Formatter}");
+            Console.Write($"  Protocol: {entry.Protocol}  Formatter: {entry.Formatter}");
             if (!string.IsNullOrEmpty(entry.Endpoint))
-                Console.Write($" -> {entry.Endpoint}");
+                Console.Write($"  Endpoint: {EscapeYaml(entry.Endpoint)}");
             if (!string.IsNullOrEmpty(entry.Error))
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.Write($" ({entry.Error})");
+                Console.Write($"  Error: {EscapeYaml(entry.Error)}");
             }
             Console.WriteLine();
         }
@@ -157,9 +157,6 @@ class Program
         var data = result.Data;
         var sb = new StringBuilder();
 
-        sb.AppendLine($"Query: {EscapeYaml(result.UsedProtocol)}");
-        sb.AppendLine($"Formatter: {EscapeYaml(result.UsedFormatter)}");
-        sb.AppendLine($"Endpoint: {EscapeYaml(result.FinalEndpoint ?? "")}");
         sb.AppendLine($"Domain: {EscapeYaml(data.Domain)}");
 
         if (data.Registry?.Name is { Length: > 0 })
@@ -245,6 +242,11 @@ class Program
                 }
             }
         }
+
+        sb.AppendLine("Meta:");
+        sb.AppendLine($"  Protocol: {EscapeYaml(result.UsedProtocol)}");
+        sb.AppendLine($"  Formatter: {EscapeYaml(result.UsedFormatter)}");
+        sb.AppendLine($"  Endpoint: {EscapeYaml(result.FinalEndpoint ?? "")}");
 
         Console.WriteLine(sb.ToString());
     }
