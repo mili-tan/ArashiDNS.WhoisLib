@@ -7,19 +7,19 @@ namespace ArashiDNS.WhoisLib.ServerDiscovery;
 
 public class CompositeServerFinder : IServerFinder
 {
-    private readonly KnownServerLookup _knownLookup;
+    private readonly TldServerLookup _tldLookup;
     private readonly DnsServerLookup _dnsLookup;
     private readonly IanaServerLookup _ianaLookup;
     private readonly IpAllocationProvider _ipProvider;
     private readonly ConcurrentDictionary<string, string> _cache = new();
 
     public CompositeServerFinder(
-        KnownServerLookup knownLookup,
+        TldServerLookup tldLookup,
         DnsServerLookup dnsLookup,
         IanaServerLookup ianaLookup,
         IpAllocationProvider ipProvider)
     {
-        _knownLookup = knownLookup;
+        _tldLookup = tldLookup;
         _dnsLookup = dnsLookup;
         _ianaLookup = ianaLookup;
         _ipProvider = ipProvider;
@@ -59,8 +59,8 @@ public class CompositeServerFinder : IServerFinder
             }
         }
 
-        // Level 1: Known list lookup
-        server = await _knownLookup.FindServerAsync(query, queryType);
+        // Level 1: TLD list lookup
+        server = await _tldLookup.FindServerAsync(query, queryType);
         if (!string.IsNullOrEmpty(server))
         {
             _cache[cacheKey] = server;

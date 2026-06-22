@@ -12,7 +12,7 @@ public class RdapClient : IWhoisClient
     private readonly HttpClient _httpClient;
     private readonly RdapResponseParser _parser;
     private readonly RdapBootstrapProvider? _bootstrapProvider;
-    private readonly RdapServerLookup _rdapLookup = new();
+    private readonly TldServerLookup _rdapLookup = new(rdapMode: true);
 
     public Action<string, bool, string?>? OnRequest { get; set; }
 

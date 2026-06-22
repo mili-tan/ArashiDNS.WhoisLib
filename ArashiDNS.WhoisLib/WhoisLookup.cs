@@ -27,7 +27,7 @@ public class WhoisLookup : IDisposable
         var rdapBootstrap = new RdapBootstrapProvider(cache, userAgent: _options.UserAgent);
 
         var serverFinder = new CompositeServerFinder(
-            new KnownServerLookup(), new DnsServerLookup(),
+            new TldServerLookup(), new DnsServerLookup(),
             new IanaServerLookup(), ipProvider);
 
         _whoisClient = new WhoisClient(serverFinder);
