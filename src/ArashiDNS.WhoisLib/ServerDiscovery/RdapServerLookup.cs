@@ -4,9 +4,6 @@ using ArashiDNS.WhoisLib.Data;
 
 namespace ArashiDNS.WhoisLib.ServerDiscovery;
 
-/// <summary>
-/// RDAP服务器查�?/// 从TldRegistryProvider获取数据
-/// </summary>
 public class RdapServerLookup : IServerFinder
 {
     public Task<string?> FindServerAsync(string query, WhoisQueryType queryType)
@@ -18,7 +15,7 @@ public class RdapServerLookup : IServerFinder
         if (string.IsNullOrEmpty(tld))
             return Task.FromResult<string?>(null);
 
-        // 先尝试完整域名匹配（如co.uk�?        var parts = query.ToLowerInvariant().TrimEnd('.').Split('.');
+        var parts = query.ToLowerInvariant().TrimEnd('.').Split('.');
         if (parts.Length > 2)
         {
             var parentDomain = string.Join('.', parts[1..]);
@@ -27,7 +24,6 @@ public class RdapServerLookup : IServerFinder
                 return Task.FromResult<string?>(parentEndpoint);
         }
 
-        // 再尝试TLD匹配
         return Task.FromResult(TldRegistryProvider.GetRdapEndpoint(tld));
     }
 

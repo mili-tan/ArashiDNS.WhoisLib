@@ -4,9 +4,6 @@ using ArashiDNS.WhoisLib.Data;
 
 namespace ArashiDNS.WhoisLib.ServerDiscovery;
 
-/// <summary>
-/// 已知WHOIS服务器查�?/// 从TldRegistryProvider获取数据
-/// </summary>
 public class KnownServerLookup : IServerFinder
 {
     public Task<string?> FindServerAsync(string query, WhoisQueryType queryType)
@@ -16,7 +13,7 @@ public class KnownServerLookup : IServerFinder
             var tld = ExtractTld(query);
             if (!string.IsNullOrEmpty(tld))
             {
-                // 先尝试完整域名匹配（如co.uk�?                var parts = query.ToLowerInvariant().TrimEnd('.').Split('.');
+                var parts = query.ToLowerInvariant().TrimEnd('.').Split('.');
                 if (parts.Length > 2)
                 {
                     var parentDomain = string.Join('.', parts[1..]);
@@ -25,11 +22,10 @@ public class KnownServerLookup : IServerFinder
                         return Task.FromResult<string?>(parentServer);
                 }
 
-                // 再尝试TLD匹配
                 return Task.FromResult(TldRegistryProvider.GetWhoisServer(tld));
             }
         }
-        else if (queryType == WhoisQueryType.Asn || queryType == WhoisQueryType.Ipv4 || queryType == WhoisQueryType.Ipv6)
+        else if (queryType is WhoisQueryType.Asn or WhoisQueryType.Ipv4 or WhoisQueryType.Ipv6)
         {
             return Task.FromResult<string?>("whois.arin.net");
         }

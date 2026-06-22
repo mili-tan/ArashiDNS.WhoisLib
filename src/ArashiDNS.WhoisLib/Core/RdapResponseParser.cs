@@ -15,38 +15,27 @@ public class RdapResponseParser
                 AllowTrailingCommas = true
             });
             var root = doc.RootElement;
-            
-            // 根据查询类型获取域名/名称
-            string domain;
-            if (queryType == WhoisQueryType.Ipv4 || queryType == WhoisQueryType.Ipv6)
-            {
-                domain = GetIpDomain(root, query);
-            }
-            else if (queryType == WhoisQueryType.Asn)
-            {
-                domain = GetAsnDomain(root, query);
-            }
-            else
-            {
-                domain = GetStringProperty(root, "ldhName") ?? query;
-            }
 
-            var response = new WhoisResponse
+            string domain = queryType switch
+            {
+                WhoisQueryType.Ipv4 or WhoisQueryType.Ipv6 => GetIpDomain(root, query),
+                WhoisQueryType.Asn => GetAsnDomain(root, query),
+                _ => GetStringProperty(root, "ldhName") ?? query
+            };
+
+            return new WhoisResponse
             {
                 Query = query,
                 QueryType = queryType,
                 RawResponse = rawJson,
                 Domain = domain,
                 IsSuccessful = true,
-                WhoisServer = endpoint
+                WhoisServer = endpoint,
+                Statuses = TryParse(() => ParseStatuses(root)) ?? [],
+                NameServers = TryParse(() => ParseNameservers(root)) ?? [],
+                Dates = TryParse(() => ParseDates(root)) ?? new DomainDates(),
+                Contacts = TryParse(() => ParseContacts(root)) ?? new ContactCollection()
             };
-
-            // 解析各个字段（尽力而为�?            response.Statuses = TryParse(() => ParseStatuses(root)) ?? new List<string>();
-            response.NameServers = TryParse(() => ParseNameservers(root)) ?? new List<string>();
-            response.Dates = TryParse(() => ParseDates(root)) ?? new DomainDates();
-            TryExecute(() => ParseEntities(response, root));
-
-            return response;
         }
         catch (Exception ex)
         {
@@ -61,18 +50,10 @@ public class RdapResponseParser
         }
     }
 
-    #region Helper Methods
-
     private T? TryParse<T>(Func<T> parser) where T : class
     {
         try { return parser(); }
         catch { return null; }
-    }
-
-    private void TryExecute(Action action)
-    {
-        try { action(); }
-        catch { }
     }
 
     private string? GetStringProperty(JsonElement element, string name)
@@ -89,46 +70,35 @@ public class RdapResponseParser
         return null;
     }
 
-    #endregion
-
-    #region Domain/IP/ASN Resolution
-
     private string GetIpDomain(JsonElement root, string query)
     {
         try
         {
             var name = GetStringProperty(root, "name");
-            if (!string.IsNullOrEmpty(name))
-                return name;
+            if (!string.IsNullOrEmpty(name)) return name;
 
             var start = GetStringProperty(root, "startAddress");
             var end = GetStringProperty(root, "endAddress");
             if (!string.IsNullOrEmpty(start) && !string.IsNullOrEmpty(end))
                 return $"{start} - {end}";
         }
-        catch
-        {
-            // 解析失败，返回查询�?        }
-
+        catch { }
         return query;
     }
 
     private string GetAsnDomain(JsonElement root, string query)
     {
-        var name = GetStringProperty(root, "name");
-        if (!string.IsNullOrEmpty(name))
-            return name;
+        try
+        {
+            var name = GetStringProperty(root, "name");
+            if (!string.IsNullOrEmpty(name)) return name;
 
-        var handle = GetStringProperty(root, "handle");
-        if (!string.IsNullOrEmpty(handle))
-            return handle;
-
+            var handle = GetStringProperty(root, "handle");
+            if (!string.IsNullOrEmpty(handle)) return handle;
+        }
+        catch { }
         return query;
     }
-
-    #endregion
-
-    #region Basic Field Parsing
 
     private List<string> ParseStatuses(JsonElement root)
     {
@@ -140,8 +110,7 @@ public class RdapResponseParser
                 if (s.ValueKind == JsonValueKind.String)
                 {
                     var value = s.GetString()?.ToLowerInvariant();
-                    if (!string.IsNullOrEmpty(value))
-                        result.Add(value);
+                    if (!string.IsNullOrEmpty(value)) result.Add(value);
                 }
             }
         }
@@ -158,8 +127,7 @@ public class RdapResponseParser
                 if (ns.TryGetProperty("ldhName", out var name) && name.ValueKind == JsonValueKind.String)
                 {
                     var value = name.GetString()?.ToLowerInvariant();
-                    if (!string.IsNullOrEmpty(value))
-                        result.Add(value);
+                    if (!string.IsNullOrEmpty(value)) result.Add(value);
                 }
             }
         }
@@ -175,25 +143,15 @@ public class RdapResponseParser
             {
                 var action = GetStringProperty(evt, "eventAction");
                 var dateStr = GetStringProperty(evt, "eventDate");
-                
-                if (string.IsNullOrEmpty(action) || string.IsNullOrEmpty(dateStr))
-                    continue;
+                if (string.IsNullOrEmpty(action) || string.IsNullOrEmpty(dateStr)) continue;
 
                 if (DateTime.TryParse(dateStr, out var date))
                 {
                     switch (action.ToLowerInvariant())
                     {
-                        case "registration":
-                            dates.Created = date;
-                            break;
-                        case "last changed":
-                        case "last update":
-                            dates.Updated = date;
-                            break;
-                        case "expiration":
-                        case "registrar expiration":
-                            dates.Expires = date;
-                            break;
+                        case "registration": dates.Created = date; break;
+                        case "last changed" or "last update": dates.Updated = date; break;
+                        case "expiration" or "registrar expiration": dates.Expires = date; break;
                     }
                 }
             }
@@ -201,87 +159,46 @@ public class RdapResponseParser
         return dates;
     }
 
-    #endregion
-
-    #region Entity Parsing
-
-    private void ParseEntities(WhoisResponse response, JsonElement root)
+    private ContactCollection ParseContacts(JsonElement root)
     {
-        if (!root.TryGetProperty("entities", out var entities) || entities.ValueKind != JsonValueKind.Array)
-            return;
-
         var contacts = new ContactCollection();
+        if (!root.TryGetProperty("entities", out var entities) || entities.ValueKind != JsonValueKind.Array)
+            return contacts;
 
         foreach (var entity in entities.EnumerateArray())
         {
             try
             {
                 var roles = ParseRoles(entity);
-                
                 if (roles.Contains("registrar"))
                 {
-                    response.Registrar = ParseRegistrar(entity);
+                    // 注册商信息由RegistryIdentifier处理
                 }
-
                 if (roles.Contains("registrant") && contacts.Registrant == null)
-                {
                     contacts.Registrant = ParseContact(entity);
-                }
-
                 if (roles.Contains("administrative") && contacts.Admin == null)
-                {
                     contacts.Admin = ParseContact(entity);
-                }
-
                 if (roles.Contains("technical") && contacts.Tech == null)
-                {
                     contacts.Tech = ParseContact(entity);
-                }
 
-                if (entity.TryGetProperty("entities", out var nestedEntities) && nestedEntities.ValueKind == JsonValueKind.Array)
+                if (entity.TryGetProperty("entities", out var nested) && nested.ValueKind == JsonValueKind.Array)
                 {
-                    ParseNestedEntities(response, contacts, nestedEntities, roles);
+                    foreach (var nestedEntity in nested.EnumerateArray())
+                    {
+                        var nestedRoles = ParseRoles(nestedEntity);
+                        var allRoles = nestedRoles.Union(roles).ToList();
+                        if (allRoles.Contains("registrant") && contacts.Registrant == null)
+                            contacts.Registrant = ParseContact(nestedEntity);
+                        if (allRoles.Contains("administrative") && contacts.Admin == null)
+                            contacts.Admin = ParseContact(nestedEntity);
+                        if (allRoles.Contains("technical") && contacts.Tech == null)
+                            contacts.Tech = ParseContact(nestedEntity);
+                    }
                 }
             }
-            catch
-            {
-                // 跳过无法解析的实�?            }
+            catch { }
         }
-
-        response.Contacts = contacts;
-    }
-
-    private void ParseNestedEntities(WhoisResponse response, ContactCollection contacts, JsonElement entities, List<string> parentRoles)
-    {
-        foreach (var entity in entities.EnumerateArray())
-        {
-            try
-            {
-                var roles = ParseRoles(entity);
-                var allRoles = roles.Union(parentRoles).ToList();
-
-                if (allRoles.Contains("registrant") && contacts.Registrant == null)
-                {
-                    contacts.Registrant = ParseContact(entity);
-                }
-                if (allRoles.Contains("administrative") && contacts.Admin == null)
-                {
-                    contacts.Admin = ParseContact(entity);
-                }
-                if (allRoles.Contains("technical") && contacts.Tech == null)
-                {
-                    contacts.Tech = ParseContact(entity);
-                }
-
-                if (entity.TryGetProperty("entities", out var nestedEntities) && nestedEntities.ValueKind == JsonValueKind.Array)
-                {
-                    ParseNestedEntities(response, contacts, nestedEntities, allRoles);
-                }
-            }
-            catch
-            {
-                // 跳过无法解析的实�?            }
-        }
+        return contacts;
     }
 
     private List<string> ParseRoles(JsonElement entity)
@@ -294,57 +211,29 @@ public class RdapResponseParser
                 if (r.ValueKind == JsonValueKind.String)
                 {
                     var value = r.GetString();
-                    if (!string.IsNullOrEmpty(value))
-                        roles.Add(value);
+                    if (!string.IsNullOrEmpty(value)) roles.Add(value);
                 }
             }
         }
         return roles;
     }
 
-    private RegistrarInfo ParseRegistrar(JsonElement entity)
-    {
-        var registrar = new RegistrarInfo();
-        
-        if (entity.TryGetProperty("vcardArray", out var vcard))
-        {
-            registrar.Name = GetVcardValue(vcard, "fn") ?? "";
-        }
-        
-        registrar.IanaId = GetPublicId(entity, "IANA Registrar ID") ?? "";
-        registrar.Website = GetLink(entity, "about") ?? "";
-
-        if (string.IsNullOrEmpty(registrar.Name))
-        {
-            registrar.Name = GetStringProperty(entity, "handle") ?? "";
-        }
-
-        return registrar;
-    }
-
     private ContactInfo ParseContact(JsonElement entity)
     {
         var contact = new ContactInfo();
-        
-        if (entity.TryGetProperty("vcardArray", out var vcard))
-        {
-            contact.Name = GetVcardValue(vcard, "fn") ?? "";
-            contact.Organization = GetVcardValue(vcard, "org") ?? "";
-            contact.Email = GetVcardEmail(vcard) ?? "";
-            contact.Phone = GetVcardPhone(vcard) ?? "";
-            contact.Street = GetVcardAddress(vcard, "street") ?? "";
-            contact.City = GetVcardAddress(vcard, "city") ?? "";
-            contact.State = GetVcardAddress(vcard, "region") ?? "";
-            contact.PostalCode = GetVcardAddress(vcard, "code") ?? "";
-            contact.Country = GetVcardAddress(vcard, "country") ?? "";
-        }
+        if (!entity.TryGetProperty("vcardArray", out var vcard)) return contact;
 
+        contact.Name = GetVcardValue(vcard, "fn") ?? "";
+        contact.Organization = GetVcardValue(vcard, "org") ?? "";
+        contact.Email = GetVcardPropertyValue(vcard, "email") ?? "";
+        contact.Phone = GetVcardPhone(vcard) ?? "";
+        contact.Street = GetVcardAddress(vcard, "street") ?? "";
+        contact.City = GetVcardAddress(vcard, "city") ?? "";
+        contact.State = GetVcardAddress(vcard, "region") ?? "";
+        contact.PostalCode = GetVcardAddress(vcard, "code") ?? "";
+        contact.Country = GetVcardAddress(vcard, "country") ?? "";
         return contact;
     }
-
-    #endregion
-
-    #region vCard Parsing
 
     private string? GetVcardValue(JsonElement vcard, string propertyName)
     {
@@ -361,26 +250,39 @@ public class RdapResponseParser
 
                 var name = arr[0].GetString();
                 if (string.Equals(name, propertyName, StringComparison.OrdinalIgnoreCase))
-                {
                     return ExtractStringValue(arr[3]);
-                }
             }
         }
         catch { }
         return null;
     }
 
-    private string? GetVcardEmail(JsonElement vcard)
+    private string? GetVcardPropertyValue(JsonElement vcard, string propertyName)
     {
-        return GetVcardValue(vcard, "email");
+        try
+        {
+            var props = GetVcardProperties(vcard);
+            if (props == null) return null;
+
+            foreach (var prop in props.Value.EnumerateArray())
+            {
+                if (prop.ValueKind != JsonValueKind.Array) continue;
+                var arr = prop.EnumerateArray().ToList();
+                if (arr.Count < 4 || arr[0].ValueKind != JsonValueKind.String) continue;
+
+                var name = arr[0].GetString();
+                if (string.Equals(name, propertyName, StringComparison.OrdinalIgnoreCase))
+                    return ExtractStringValue(arr[3]);
+            }
+        }
+        catch { }
+        return null;
     }
 
     private string? GetVcardPhone(JsonElement vcard)
     {
-        var value = GetVcardValue(vcard, "tel");
-        if (value?.StartsWith("tel:") == true)
-            value = value[4..];
-        return value;
+        var value = GetVcardPropertyValue(vcard, "tel");
+        return value?.StartsWith("tel:") == true ? value[4..] : value;
     }
 
     private string? GetVcardAddress(JsonElement vcard, string part)
@@ -398,10 +300,9 @@ public class RdapResponseParser
 
                 var name = arr[0].GetString();
                 if (!string.Equals(name, "adr", StringComparison.OrdinalIgnoreCase)) continue;
-
                 if (arr[3].ValueKind != JsonValueKind.Array) continue;
-                var addrParts = arr[3].EnumerateArray().ToList();
 
+                var addrParts = arr[3].EnumerateArray().ToList();
                 return part.ToLowerInvariant() switch
                 {
                     "street" => addrParts.Count > 2 ? ExtractStringValue(addrParts[2]) : null,
@@ -422,14 +323,9 @@ public class RdapResponseParser
         try
         {
             if (vcard.ValueKind == JsonValueKind.Array && vcard.GetArrayLength() > 1)
-            {
                 return vcard[1];
-            }
-            
             if (vcard.TryGetProperty("value", out var val))
-            {
                 return val;
-            }
         }
         catch { }
         return null;
@@ -451,50 +347,4 @@ public class RdapResponseParser
         }
         catch { return null; }
     }
-
-    #endregion
-
-    #region Public IDs and Links
-
-    private string? GetPublicId(JsonElement entity, string type)
-    {
-        try
-        {
-            if (entity.TryGetProperty("publicIds", out var publicIds) && publicIds.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var pid in publicIds.EnumerateArray())
-                {
-                    var pidType = GetStringProperty(pid, "type");
-                    if (string.Equals(pidType, type, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return GetStringProperty(pid, "identifier");
-                    }
-                }
-            }
-        }
-        catch { }
-        return null;
-    }
-
-    private string? GetLink(JsonElement entity, string rel)
-    {
-        try
-        {
-            if (entity.TryGetProperty("links", out var links) && links.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var link in links.EnumerateArray())
-                {
-                    var linkRel = GetStringProperty(link, "rel");
-                    if (string.Equals(linkRel, rel, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return GetStringProperty(link, "href");
-                    }
-                }
-            }
-        }
-        catch { }
-        return null;
-    }
-
-    #endregion
 }

@@ -13,8 +13,8 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        Console.WriteLine("WHOIS/RDAP Lookup Demo");
-        Console.WriteLine("======================\n");
+        Console.WriteLine("ArashiDNS WHOIS/RDAP Demo");
+        Console.WriteLine("=========================\n");
 
         if (args.Length == 0)
         {
@@ -30,12 +30,11 @@ class Program
         string? model = null;
         string? apiEndpoint = null;
 
-        // 解析命令行参�?        for (int i = 1; i < args.Length; i++)
+        for (int i = 1; i < args.Length; i++)
         {
             switch (args[i])
             {
-                case "--llm":
-                case "--ai":
+                case "--llm" or "--ai":
                     if (i + 1 < args.Length) apiKey = args[++i];
                     break;
                 case "--model":
@@ -65,7 +64,6 @@ class Program
             Console.WriteLine($"Querying: {query} (Protocol: {(useRdap ? "RDAP" : "WHOIS")})\n");
 
             WhoisResponse response;
-
             if (useRdap)
             {
                 response = await rdapClient.QueryAsync(query);
@@ -73,14 +71,12 @@ class Program
             else
             {
                 response = await whoisClient.QueryAsync(query);
-
                 if (!response.IsSuccessful)
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.WriteLine($"WHOIS failed: {response.ErrorMessage}");
                     Console.WriteLine("Trying RDAP...\n");
                     Console.ResetColor();
-
                     response = await rdapClient.QueryAsync(query);
                 }
             }
@@ -93,7 +89,6 @@ class Program
                 return;
             }
 
-            // 选择格式化器
             IWhoisFormatter formatter;
             if (!string.IsNullOrEmpty(apiKey))
             {
@@ -102,13 +97,8 @@ class Program
                     ApiKey = apiKey,
                     EnableThinking = enableThinking
                 };
-
-                if (!string.IsNullOrEmpty(model))
-                    options.Model = model;
-
-                if (!string.IsNullOrEmpty(apiEndpoint))
-                    options.ApiEndpoint = apiEndpoint;
-
+                if (!string.IsNullOrEmpty(model)) options.Model = model;
+                if (!string.IsNullOrEmpty(apiEndpoint)) options.ApiEndpoint = apiEndpoint;
                 formatter = new LlmFormatter(options);
             }
             else
@@ -119,13 +109,9 @@ class Program
             var result = await formatter.FormatAsync(response);
 
             if (outputJson || !string.IsNullOrEmpty(apiKey))
-            {
                 OutputJson(result);
-            }
             else
-            {
                 OutputFormatted(result, response);
-            }
         }
         catch (Exception ex)
         {
@@ -142,7 +128,7 @@ class Program
         Console.WriteLine("  --json              Output as JSON");
         Console.WriteLine("  --rdap              Use RDAP protocol");
         Console.WriteLine("  --llm <api-key>     Use LLM for formatting");
-        Console.WriteLine("  --model <name>      LLM model name (default: deepseek-v4-flash)");
+        Console.WriteLine("  --model <name>      LLM model (default: deepseek-v4-flash)");
         Console.WriteLine("  --endpoint <url>    LLM API endpoint");
         Console.WriteLine("  --think             Enable LLM thinking mode");
         Console.WriteLine("\nExamples:");
@@ -150,7 +136,6 @@ class Program
         Console.WriteLine("  whois-demo google.com --rdap");
         Console.WriteLine("  whois-demo google.com --json");
         Console.WriteLine("  whois-demo google.com --llm sk-xxx");
-        Console.WriteLine("  whois-demo google.com --llm sk-xxx --model deepseek-v4-pro --think");
     }
 
     static void OutputFormatted(FormattedResult result, WhoisResponse response)
@@ -159,44 +144,34 @@ class Program
         Console.WriteLine($"Domain: {result.Domain}");
         Console.ResetColor();
 
-        if (result.Registry != null && !string.IsNullOrEmpty(result.Registry.Name))
+        if (result.Registry?.Name is { Length: > 0 })
         {
             Console.WriteLine($"\nRegistry: {result.Registry.Name}");
-            if (!string.IsNullOrEmpty(result.Registry.Website))
-                Console.WriteLine($"  Website: {result.Registry.Website}");
-            if (!string.IsNullOrEmpty(result.Registry.WhoisServer))
-                Console.WriteLine($"  WHOIS Server: {result.Registry.WhoisServer}");
+            if (result.Registry.Website is { Length: > 0 }) Console.WriteLine($"  Website: {result.Registry.Website}");
+            if (result.Registry.WhoisServer is { Length: > 0 }) Console.WriteLine($"  WHOIS Server: {result.Registry.WhoisServer}");
         }
 
-        if (result.Registrar != null && !string.IsNullOrEmpty(result.Registrar.Name))
+        if (result.Registrar?.Name is { Length: > 0 })
         {
             Console.WriteLine($"\nRegistrar: {result.Registrar.Name}");
-            if (!string.IsNullOrEmpty(result.Registrar.IanaId))
-                Console.WriteLine($"  IANA ID: {result.Registrar.IanaId}");
-            if (!string.IsNullOrEmpty(result.Registrar.Website))
-                Console.WriteLine($"  Website: {result.Registrar.Website}");
-            if (!string.IsNullOrEmpty(result.Registrar.WhoisServer))
-                Console.WriteLine($"  WHOIS Server: {result.Registrar.WhoisServer}");
+            if (result.Registrar.IanaId is { Length: > 0 }) Console.WriteLine($"  IANA ID: {result.Registrar.IanaId}");
+            if (result.Registrar.Website is { Length: > 0 }) Console.WriteLine($"  Website: {result.Registrar.Website}");
         }
 
         if (result.Privacy?.IsPrivate == true)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"\nPrivacy Protection: YES");
-            if (!string.IsNullOrEmpty(result.Privacy.Provider))
-                Console.WriteLine($"  Provider: {result.Privacy.Provider}");
+            if (result.Privacy.Provider is { Length: > 0 }) Console.WriteLine($"  Provider: {result.Privacy.Provider}");
             Console.ResetColor();
         }
 
         if (result.Dates != null)
         {
             Console.WriteLine("\nDates:");
-            if (result.Dates.Created.HasValue)
-                Console.WriteLine($"  Created: {result.Dates.Created:yyyy-MM-dd}");
-            if (result.Dates.Updated.HasValue)
-                Console.WriteLine($"  Updated: {result.Dates.Updated:yyyy-MM-dd}");
-            if (result.Dates.Expires.HasValue)
-                Console.WriteLine($"  Expires: {result.Dates.Expires:yyyy-MM-dd}");
+            if (result.Dates.Created.HasValue) Console.WriteLine($"  Created: {result.Dates.Created:yyyy-MM-dd}");
+            if (result.Dates.Updated.HasValue) Console.WriteLine($"  Updated: {result.Dates.Updated:yyyy-MM-dd}");
+            if (result.Dates.Expires.HasValue) Console.WriteLine($"  Expires: {result.Dates.Expires:yyyy-MM-dd}");
         }
 
         if (result.Contacts.Count > 0)
@@ -205,37 +180,23 @@ class Program
             foreach (var contact in result.Contacts)
             {
                 Console.WriteLine($"  [{string.Join(", ", contact.Roles)}]");
-                if (!string.IsNullOrEmpty(contact.Name))
-                    Console.WriteLine($"    Name: {contact.Name}");
-                if (!string.IsNullOrEmpty(contact.Organization))
-                    Console.WriteLine($"    Organization: {contact.Organization}");
-                if (!string.IsNullOrEmpty(contact.Email))
-                    Console.WriteLine($"    Email: {contact.Email}");
-                if (!string.IsNullOrEmpty(contact.Phone))
-                    Console.WriteLine($"    Phone: {contact.Phone}");
-                if (!string.IsNullOrEmpty(contact.Country))
-                    Console.WriteLine($"    Country: {contact.Country}");
+                if (contact.Name is { Length: > 0 }) Console.WriteLine($"    Name: {contact.Name}");
+                if (contact.Organization is { Length: > 0 }) Console.WriteLine($"    Org: {contact.Organization}");
+                if (contact.Email is { Length: > 0 }) Console.WriteLine($"    Email: {contact.Email}");
+                if (contact.Country is { Length: > 0 }) Console.WriteLine($"    Country: {contact.Country}");
             }
         }
 
         if (result.NameServers.Count > 0)
         {
             Console.WriteLine("\nName Servers:");
-            foreach (var ns in result.NameServers)
-                Console.WriteLine($"  - {ns}");
-        }
-
-        if (result.Statuses.Count > 0)
-        {
-            Console.WriteLine("\nStatus:");
-            foreach (var status in result.Statuses)
-                Console.WriteLine($"  - {status}");
+            foreach (var ns in result.NameServers) Console.WriteLine($"  - {ns}");
         }
 
         Console.WriteLine($"\nQuery Details:");
         Console.WriteLine($"  Server: {response.WhoisServer}");
         if (response.ReferralChain.Count > 1)
-            Console.WriteLine($"  Referral Chain: {string.Join(" -> ", response.ReferralChain)}");
+            Console.WriteLine($"  Chain: {string.Join(" -> ", response.ReferralChain)}");
     }
 
     static void OutputJson(FormattedResult result)
@@ -251,9 +212,6 @@ class Program
             var jsonDoc = JsonDocument.Parse(json);
             Console.WriteLine(JsonSerializer.Serialize(jsonDoc, new JsonSerializerOptions { WriteIndented = true }));
         }
-        catch
-        {
-            Console.WriteLine(json);
-        }
+        catch { Console.WriteLine(json); }
     }
 }
