@@ -22,6 +22,8 @@ class Program
         var useRdap = args.Contains("--rdap");
         var useWhois = args.Contains("--whois");
         var useLlm = args.Contains("--llm");
+        var traceMode = args.Contains("-t");
+        var showEndpoint = args.Contains("--endpoint");
         var enableThinking = args.Contains("--think");
         string? apiKey = null;
         string? model = null;
@@ -50,10 +52,47 @@ class Program
 
         var result = await Whois.LookupAsync(query, options);
 
+        // Print trace if enabled
+        if (traceMode && result.Trace.Count > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine("--- Trace ---");
+            foreach (var entry in result.Trace)
+            {
+                var status = entry.Success ? "OK" : "FAIL";
+                var color = entry.Success ? ConsoleColor.Green : ConsoleColor.Red;
+                Console.ForegroundColor = color;
+                Console.Write($"  [{status}]");
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($" {entry.Protocol}/{entry.Formatter}");
+                if (!string.IsNullOrEmpty(entry.Endpoint))
+                    Console.Write($" -> {entry.Endpoint}");
+                if (!string.IsNullOrEmpty(entry.Error))
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.Write($" ({entry.Error})");
+                }
+                Console.WriteLine();
+            }
+            Console.ResetColor();
+            Console.WriteLine();
+        }
+
         if (!result.IsSuccessful)
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"Error: {result.ErrorMessage}");
+            Console.ResetColor();
+            return;
+        }
+
+        // Show endpoint only
+        if (showEndpoint)
+        {
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"Protocol: {result.UsedProtocol}");
+            Console.WriteLine($"Formatter: {result.UsedFormatter}");
+            Console.WriteLine($"Endpoint: {result.FinalEndpoint}");
             Console.ResetColor();
             return;
         }
@@ -77,13 +116,17 @@ class Program
         Console.WriteLine("  --rdap          Use RDAP only");
         Console.WriteLine("  --whois         Use WHOIS only");
         Console.WriteLine("  --llm           Use LLM formatter");
+        Console.WriteLine("  -t              Trace mode (show each request step)");
+        Console.WriteLine("  --endpoint      Show final endpoint only");
         Console.WriteLine("  --api-key KEY   DeepSeek API key");
         Console.WriteLine("  --model NAME    LLM model name");
         Console.WriteLine("  --think         Enable LLM thinking");
         Console.WriteLine("\nExamples:");
         Console.WriteLine("  whois-demo google.com");
-        Console.WriteLine("  whois-demo 8.8.8.8 --json");
-        Console.WriteLine("  whois-demo baidu.com --llm");
+        Console.WriteLine("  whois-demo google.com -t");
+        Console.WriteLine("  whois-demo google.com --endpoint");
+        Console.WriteLine("  whois-demo google.com --rdap --json");
+        Console.WriteLine("  whois-demo google.com --llm");
     }
 
     static void OutputFormatted(QueryResult result)
@@ -151,7 +194,6 @@ class Program
             Console.WriteLine("\nDNSSEC:");
             Console.WriteLine($"  Signed: {(data.Dnssec.Signed ? "Yes" : "No")}");
             Console.WriteLine($"  Delegation Signed: {(data.Dnssec.DelegationSigned ? "Yes" : "No")}");
-            
             if (data.Dnssec.DsRecords.Count > 0)
             {
                 Console.WriteLine("  DS Records:");
@@ -174,7 +216,7 @@ class Program
             result.Data.NameServers,
             result.Data.Statuses,
             result.Data.Dnssec,
-            Meta = new { result.UsedProtocol, result.UsedFormatter }
+            Meta = new { result.UsedProtocol, result.UsedFormatter, result.FinalEndpoint }
         };
 
         Console.WriteLine(JsonSerializer.Serialize(output, new JsonSerializerOptions

@@ -32,8 +32,22 @@ public class QueryResult
     public string RawResponse { get; set; } = string.Empty;
     public string UsedProtocol { get; set; } = string.Empty;
     public string UsedFormatter { get; set; } = string.Empty;
+    public string? FinalEndpoint { get; set; }
+    public List<TraceEntry> Trace { get; set; } = new();
     public bool IsSuccessful { get; set; }
     public string? ErrorMessage { get; set; }
+}
+
+/// <summary>
+/// 追踪条目
+/// </summary>
+public class TraceEntry
+{
+    public string Protocol { get; set; } = string.Empty;
+    public string Endpoint { get; set; } = string.Empty;
+    public string Formatter { get; set; } = string.Empty;
+    public bool Success { get; set; }
+    public string? Error { get; set; }
 }
 
 /// <summary>
