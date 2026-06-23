@@ -4,7 +4,7 @@ using ArashiDNS.WhoisLib;
 using ArashiDNS.WhoisLib.Contracts.Models;
 using McMaster.Extensions.CommandLineUtils;
 
-namespace ArashiDNS.WhoisDemo;
+namespace ArashiDNS.WhoisCLI;
 
 class Program
 {
@@ -33,10 +33,13 @@ class WhoisCommand
     [Option("--llm", "Use LLM formatter (optionally specify API key)", CommandOptionType.SingleOrNoValue)]
     public string? LlmApiKey { get; set; }
 
+    [Option("--llm-endpoint", "LLM API endpoint URL", CommandOptionType.SingleValue)]
+    public string? LlmEndpoint { get; set; }
+
     [Option("-t|--trace", "Show trace information", CommandOptionType.NoValue)]
     public bool TraceMode { get; set; }
 
-    [Option("--endpoint", "Show endpoint only", CommandOptionType.NoValue)]
+    [Option("--show-endpoint", "Show endpoint only", CommandOptionType.NoValue)]
     public bool ShowEndpoint { get; set; }
 
     [Option("--model", "LLM model name", CommandOptionType.SingleValue)]
@@ -56,6 +59,7 @@ class WhoisCommand
         var options = new WhoisClientOptions
         {
             Strategy = QueryStrategy.RdapFirst,
+            LlmApiEndpoint = LlmEndpoint,
             LlmApiKey = LlmApiKey,
             LlmModel = Model,
             LlmEnableThinking = EnableThinking,

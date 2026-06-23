@@ -37,25 +37,28 @@ var result = await Whois.LookupAsync("google.com", options);
 
 ```bash
 # Basic lookup (RDAP → WHOIS → LLM fallback)
-ArashiDNS.WhoisDemo google.com
+ArashiDNS.WhoisCLI google.com
 
 # RDAP only
-ArashiDNS.WhoisDemo google.com --rdap
+ArashiDNS.WhoisCLI google.com --rdap
 
 # WHOIS only
-ArashiDNS.WhoisDemo google.com --whois
+ArashiDNS.WhoisCLI google.com --whois
 
 # With LLM formatting
-ArashiDNS.WhoisDemo google.com --llm
+ArashiDNS.WhoisCLI google.com --llm
+
+# With custom LLM endpoint
+ArashiDNS.WhoisCLI google.com --llm --llm-endpoint "https://api.example.com/v1"
 
 # Trace mode (show each request step)
-ArashiDNS.WhoisDemo google.com -t
+ArashiDNS.WhoisCLI google.com -t
 
 # Show final endpoint
-ArashiDNS.WhoisDemo google.com --endpoint
+ArashiDNS.WhoisCLI google.com --show-endpoint
 
 # JSON output
-ArashiDNS.WhoisDemo google.com --json
+ArashiDNS.WhoisCLI google.com --json
 ```
 
 ## Query Strategies
@@ -129,7 +132,7 @@ ArashiDNS.WhoisLib/
 ├── Formatting/         # Traditional and LLM formatters
 └── ServerDiscovery/    # Server lookup implementations
 
-ArashiDNS.WhoisDemo/    # CLI demo application
+ArashiDNS.WhoisCLI/    # CLI demo application
 ```
 
 ## License
