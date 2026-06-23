@@ -16,21 +16,96 @@ A C# WHOIS/RDAP lookup library with registry/registrar identification, privacy d
 
 ## Quick Start
 
+### WhoisLookup (Recommended)
+
 ```csharp
 using ArashiDNS.WhoisLib;
 
-// Simple usage
-var result = await Whois.LookupAsync("google.com");
-Console.WriteLine(result.Data.Domain);
-Console.WriteLine(result.Data.Registrar?.Name);
+var result = await new WhoisLookup().QueryAsync("google.com");
 
-// With options
-var options = new WhoisClientOptions
+using var client = new WhoisLookup(new WhoisClientOptions
 {
     Strategy = QueryStrategy.RdapFirst,
     LlmApiKey = "sk-xxx"
+});
+
+foreach (var domain in new[] { "google.com", "github.com", "example.com" })
+{
+    var result = await client.QueryAsync(domain);
+    Console.WriteLine($"{result.Data.Domain} - {result.Data.Registrar?.Name}");
+}
+```
+
+### Static Helper
+
+```csharp
+using ArashiDNS.WhoisLib;
+
+var result = await Whois.LookupAsync("google.com");
+
+var result = await Whois.LookupAsync("google.com", new WhoisClientOptions
+{
+    Strategy = QueryStrategy.WhoisLlmOnly,
+    LlmApiKey = "sk-xxx"
+});
+```
+
+### Direct RDAP Query
+
+```csharp
+using ArashiDNS.WhoisLib.Core;
+
+var client = new RdapClient();
+var response = await client.QueryAsync("google.com");
+
+Console.WriteLine(response.RawResponse);
+Console.WriteLine(response.Domain);
+```
+
+### Direct WHOIS Query
+
+```csharp
+using ArashiDNS.WhoisLib.Core;
+using ArashiDNS.WhoisLib.ServerDiscovery;
+
+var serverFinder = new CompositeServerFinder();
+var client = new WhoisClient(serverFinder);
+var response = await client.QueryAsync("google.com");
+
+Console.WriteLine(response.RawResponse);
+```
+
+### Traditional Formatter
+
+```csharp
+using ArashiDNS.WhoisLib.Formatting;
+using ArashiDNS.WhoisLib.Data;
+
+var registrarProvider = new RegistrarListProvider();
+var formatter = new TraditionalFormatter(registrarProvider);
+
+var result = await formatter.FormatAsync(whoisResponse);
+Console.WriteLine(result.Domain);
+Console.WriteLine(result.Registrar?.Name);
+Console.WriteLine(result.Dates?.Created);
+```
+
+### LLM Formatter
+
+```csharp
+using ArashiDNS.WhoisLib.Formatting;
+
+var options = new LlmFormatterOptions
+{
+    ApiKey = "sk-xxx",
+    Model = "deepseek-v4-flash",
+    ApiEndpoint = "https://api.deepseek.com/chat/completions",
+    EnableThinking = false
 };
-var result = await Whois.LookupAsync("google.com", options);
+var formatter = new LlmFormatter(options);
+
+var result = await formatter.FormatAsync(whoisResponse);
+Console.WriteLine(result.RawJson);
 ```
 
 ## CLI Usage
