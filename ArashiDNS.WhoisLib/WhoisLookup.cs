@@ -148,7 +148,18 @@ public class WhoisLookup : IDisposable
     {
         try
         {
-            var response = await _rdapClient.QueryAsync(query);
+            WhoisResponse response;
+            
+            if (!string.IsNullOrEmpty(_options.CustomRdapEndpoint))
+            {
+                // Use custom RDAP endpoint
+                response = await _rdapClient.QueryAsync(query, _options.CustomRdapEndpoint);
+            }
+            else
+            {
+                response = await _rdapClient.QueryAsync(query);
+            }
+            
             trace.Add(new TraceEntry
             {
                 Protocol = "RDAP", Endpoint = response.WhoisServer,
@@ -177,7 +188,17 @@ public class WhoisLookup : IDisposable
     {
         try
         {
-            var response = await _whoisClient.QueryAsync(query);
+            WhoisResponse response;
+            
+            if (!string.IsNullOrEmpty(_options.CustomWhoisServer))
+            {
+                // Use custom WHOIS server
+                response = await _whoisClient.QueryAsync(query, _options.CustomWhoisServer);
+            }
+            else
+            {
+                response = await _whoisClient.QueryAsync(query);
+            }
 
             foreach (var server in response.ReferralChain)
             {

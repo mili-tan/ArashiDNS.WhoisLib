@@ -47,6 +47,12 @@ public class RdapClient : IWhoisClient
 
     public async Task<WhoisResponse> QueryAsync(string query, string server)
     {
+        if (!string.IsNullOrEmpty(server))
+        {
+            // Use custom RDAP endpoint
+            var endpoint = server.TrimEnd('/') + "/domain/" + Uri.EscapeDataString(query.ToUpperInvariant());
+            return await QueryWithReferralAsync(query, DetectQueryType(query), endpoint);
+        }
         return await QueryAsync(query);
     }
 

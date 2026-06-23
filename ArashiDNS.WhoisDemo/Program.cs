@@ -2,54 +2,79 @@ using System.Text;
 using System.Text.Json;
 using ArashiDNS.WhoisLib;
 using ArashiDNS.WhoisLib.Contracts.Models;
+using McMaster.Extensions.CommandLineUtils;
 
 namespace ArashiDNS.WhoisDemo;
 
 class Program
 {
-    static async Task Main(string[] args)
+    static Task<int> Main(string[] args) => CommandLineApplication.ExecuteAsync<WhoisCommand>(args);
+}
+
+[Command(Name = "whois", Description = "WHOIS/RDAP lookup tool")]
+[HelpOption("-h|--help")]
+class WhoisCommand
+{
+    [Argument(0, "query", "Domain, IP address, or ASN to query")]
+    public string Query { get; set; } = "";
+
+    [Option("-j|--json", "Output as JSON", CommandOptionType.NoValue)]
+    public bool OutputJson { get; set; }
+
+    [Option("--raw", "Output raw WHOIS/RDAP response", CommandOptionType.NoValue)]
+    public bool OutputRaw { get; set; }
+
+    [Option("--rdap", "Use RDAP (optionally specify server URL)", CommandOptionType.SingleOrNoValue)]
+    public string? RdapServer { get; set; }
+
+    [Option("--whois", "Use WHOIS (optionally specify server)", CommandOptionType.SingleOrNoValue)]
+    public string? WhoisServer { get; set; }
+
+    [Option("--llm", "Use LLM formatter (optionally specify API key)", CommandOptionType.SingleOrNoValue)]
+    public string? LlmApiKey { get; set; }
+
+    [Option("-t|--trace", "Show trace information", CommandOptionType.NoValue)]
+    public bool TraceMode { get; set; }
+
+    [Option("--endpoint", "Show endpoint only", CommandOptionType.NoValue)]
+    public bool ShowEndpoint { get; set; }
+
+    [Option("--model", "LLM model name", CommandOptionType.SingleValue)]
+    public string? Model { get; set; }
+
+    [Option("--think", "Enable LLM thinking mode", CommandOptionType.NoValue)]
+    public bool EnableThinking { get; set; }
+
+    private async Task<int> OnExecuteAsync(IConsole console)
     {
-        if (args.Length == 0)
+        if (string.IsNullOrEmpty(Query))
         {
-            PrintUsage();
-            return;
-        }
-
-        var query = args[0];
-        var outputJson = args.Contains("--json");
-        var useRdap = args.Contains("--rdap");
-        var useWhois = args.Contains("--whois");
-        var useLlm = args.Contains("--llm");
-        var traceMode = args.Contains("-t");
-        var showEndpoint = args.Contains("--endpoint");
-        var enableThinking = args.Contains("--think");
-        string? apiKey = null;
-        string? model = null;
-
-        for (int i = 1; i < args.Length; i++)
-        {
-            if (args[i] == "--api-key" && i + 1 < args.Length)
-                apiKey = args[++i];
-            if (args[i] == "--model" && i + 1 < args.Length)
-                model = args[++i];
+            console.Error.WriteLine("Error: Query parameter is required.");
+            return 1;
         }
 
         var options = new WhoisClientOptions
         {
             Strategy = QueryStrategy.RdapFirst,
-            LlmApiKey = apiKey,
-            LlmModel = model,
-            LlmEnableThinking = enableThinking
+            LlmApiKey = LlmApiKey,
+            LlmModel = Model,
+            LlmEnableThinking = EnableThinking,
+            CustomRdapEndpoint = RdapServer,
+            CustomWhoisServer = WhoisServer
         };
 
-        if (useRdap) options.Strategy = QueryStrategy.RdapTraditionOnly;
-        else if (useWhois) options.Strategy = QueryStrategy.WhoisTraditionOnly;
-        else if (useLlm) options.Strategy = QueryStrategy.WhoisLlmOnly;
+        // Determine strategy based on options
+        if (!string.IsNullOrEmpty(RdapServer))
+            options.Strategy = QueryStrategy.RdapTraditionOnly;
+        else if (!string.IsNullOrEmpty(WhoisServer))
+            options.Strategy = QueryStrategy.WhoisTraditionOnly;
+        else if (LlmApiKey != null) // --llm was specified (with or without value)
+            options.Strategy = QueryStrategy.WhoisLlmOnly;
 
-        var result = await Whois.LookupAsync(query, options);
+        var result = await Whois.LookupAsync(Query, options);
 
         List<object>? traceData = null;
-        if (traceMode && result.Trace.Count > 0)
+        if (TraceMode && result.Trace.Count > 0)
         {
             traceData = result.Trace.Select(t => (object)new
             {
@@ -63,7 +88,7 @@ class Program
 
         if (!result.IsSuccessful)
         {
-            if (outputJson)
+            if (OutputJson)
             {
                 var errorOutput = new { error = result.ErrorMessage, trace = traceData };
                 Console.WriteLine(JsonSerializer.Serialize(errorOutput, new JsonSerializerOptions { WriteIndented = true }));
@@ -72,15 +97,15 @@ class Program
             {
                 if (traceData != null) OutputYamlTrace(result.Trace);
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Error: {result.ErrorMessage}");
+                Console.Error.WriteLine($"Error: {result.ErrorMessage}");
                 Console.ResetColor();
             }
-            return;
+            return 1;
         }
 
-        if (showEndpoint)
+        if (ShowEndpoint)
         {
-            if (outputJson)
+            if (OutputJson)
             {
                 var endpointOutput = new { protocol = result.UsedProtocol, formatter = result.UsedFormatter, endpoint = result.FinalEndpoint };
                 Console.WriteLine(JsonSerializer.Serialize(endpointOutput, new JsonSerializerOptions { WriteIndented = true }));
@@ -93,41 +118,27 @@ class Program
                 Console.WriteLine($"Endpoint: {result.FinalEndpoint}");
                 Console.ResetColor();
             }
-            return;
+            return 0;
         }
 
-        if (outputJson)
-            OutputJson(result, traceData);
+        if (OutputRaw)
+        {
+            Console.Write(result.RawResponse);
+            return 0;
+        }
+
+        if (OutputJson)
+            OutputJsonResult(result, traceData);
         else
         {
             if (traceData != null) OutputYamlTrace(result.Trace);
             OutputYaml(result);
         }
+
+        return 0;
     }
 
-    static void PrintUsage()
-    {
-        Console.WriteLine("ArashiDNS WHOIS/RDAP Lookup");
-        Console.WriteLine("==========================\n");
-        Console.WriteLine("Usage: whois-demo <query> [options]\n");
-        Console.WriteLine("Query: domain, IP address, or ASN\n");
-        Console.WriteLine("Options:");
-        Console.WriteLine("  --json          Output as JSON");
-        Console.WriteLine("  --rdap          Use RDAP only");
-        Console.WriteLine("  --whois         Use WHOIS only");
-        Console.WriteLine("  --llm           Use LLM formatter");
-        Console.WriteLine("  -t              Trace mode");
-        Console.WriteLine("  --endpoint      Show endpoint only");
-        Console.WriteLine("  --api-key KEY   API key for LLM");
-        Console.WriteLine("  --model NAME    LLM model name");
-        Console.WriteLine("  --think         Enable LLM thinking\n");
-        Console.WriteLine("Examples:");
-        Console.WriteLine("  whois-demo google.com");
-        Console.WriteLine("  whois-demo google.com --rdap -t");
-        Console.WriteLine("  whois-demo google.com --json");
-    }
-
-    static void OutputYamlTrace(List<TraceEntry> trace)
+    private static void OutputYamlTrace(List<TraceEntry> trace)
     {
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine("Trace:");
@@ -152,11 +163,10 @@ class Program
         Console.WriteLine();
     }
 
-    static void OutputYaml(QueryResult result)
+    private static void OutputYaml(QueryResult result)
     {
         var data = result.Data;
 
-        // Domain with highlight
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine($"Domain: {EscapeYaml(data.Domain)}");
         Console.ResetColor();
@@ -181,7 +191,6 @@ class Program
                 Console.WriteLine($"  Website: {EscapeYaml(data.Registrar.Website)}");
         }
 
-        // Privacy with highlight
         if (data.Privacy?.IsPrivate == true)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
@@ -254,7 +263,7 @@ class Program
         Console.WriteLine($"  Endpoint: {EscapeYaml(result.FinalEndpoint ?? "")}");
     }
 
-    static string EscapeYaml(string value)
+    private static string EscapeYaml(string value)
     {
         if (string.IsNullOrEmpty(value)) return "\"\"";
         if (value.Contains(':') || value.Contains('#') || value.Contains('"') ||
@@ -265,7 +274,7 @@ class Program
         return value;
     }
 
-    static void OutputJson(QueryResult result, List<object>? traceData)
+    private static void OutputJsonResult(QueryResult result, List<object>? traceData)
     {
         var output = new
         {

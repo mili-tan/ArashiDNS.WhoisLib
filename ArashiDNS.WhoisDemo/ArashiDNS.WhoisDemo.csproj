@@ -6,8 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>ArashiDNS.WhoisDemo</RootNamespace>
-    <AssemblyName>ArashiDNS.WhoisDemo</AssemblyName>
+    <AssemblyName>whois</AssemblyName>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="McMaster.Extensions.CommandLineUtils" Version="4.1.0" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ArashiDNS.WhoisLib\ArashiDNS.WhoisLib.csproj" />

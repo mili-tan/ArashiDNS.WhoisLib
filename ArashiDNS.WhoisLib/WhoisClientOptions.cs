@@ -78,4 +78,10 @@ public class WhoisClientOptions
 
     /// <summary>是否过滤空联系人（默认true）</summary>
     public bool FilterEmptyContacts { get; set; } = true;
+
+    /// <summary>自定义RDAP服务器端点（覆盖自动发现）</summary>
+    public string? CustomRdapEndpoint { get; set; }
+
+    /// <summary>自定义WHOIS服务器（覆盖自动发现）</summary>
+    public string? CustomWhoisServer { get; set; }
 }
