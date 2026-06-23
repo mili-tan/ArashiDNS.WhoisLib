@@ -242,7 +242,7 @@ public class RdapBootstrapProvider
     {
         if (_ipv6Endpoints == null) return null;
 
-        // 简化的IPv6查找，匹配前缀
+        // Simplified IPv6 lookup, match prefix
         var addrStr = ipAddress.ToString();
         return _ipv6Endpoints.FirstOrDefault(r => addrStr.StartsWith(r.Prefix.Split('/')[0]))?.Url;
     }

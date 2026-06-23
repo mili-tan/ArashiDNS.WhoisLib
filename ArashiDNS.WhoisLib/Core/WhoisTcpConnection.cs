@@ -31,7 +31,7 @@ public class WhoisTcpConnection : IDisposable
                 }
                 catch
                 {
-                    // 编码注册失败，使用默认编�?                    _encodingRegistered = true;
+                    // Encoding registration failed, using default encoding
                 }
             }
         }
@@ -116,18 +116,19 @@ public class WhoisTcpConnection : IDisposable
         if (data.Length == 0)
             return string.Empty;
 
-        // 尝试UTF-8解码
+        // Try UTF-8 decoding
         try
         {
             var utf8 = Encoding.UTF8.GetString(data);
-            // 检查是否有替换字符（解码失败的标志�?            if (!utf8.Contains('\uFFFD'))
+            // Check for replacement characters (sign of decode failure)
+            if (!utf8.Contains('\uFFFD'))
                 return utf8;
         }
         catch
         {
         }
 
-        // 尝试GBK解码
+        // Try GBK decoding
         try
         {
             var gbk = Encoding.GetEncoding("GBK").GetString(data);
@@ -138,7 +139,7 @@ public class WhoisTcpConnection : IDisposable
         {
         }
 
-        // 尝试GB18030解码
+        // Try GB18030 decoding
         try
         {
             var gb18030 = Encoding.GetEncoding("GB18030").GetString(data);
@@ -149,7 +150,7 @@ public class WhoisTcpConnection : IDisposable
         {
         }
 
-        // 回退到Latin1（不会丢失数据）
+        // Fall back to Latin1 (no data loss)
         return Encoding.Latin1.GetString(data);
     }
 

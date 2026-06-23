@@ -3,28 +3,28 @@ using ArashiDNS.WhoisLib.Contracts.Models;
 namespace ArashiDNS.WhoisLib;
 
 /// <summary>
-/// 查询策略
+/// Query strategy
 /// </summary>
 public enum QueryStrategy
 {
-    /// <summary>Rdap优先: RDAP+传统 → WHOIS+传统 → WHOIS+LLM</summary>
+    /// <summary>Rdap first: RDAP+Traditional → WHOIS+Traditional → WHOIS+LLM</summary>
     RdapFirst,
-    /// <summary>Whois优先: WHOIS+传统 → RDAP+传统 → WHOIS+LLM</summary>
+    /// <summary>Whois first: WHOIS+Traditional → RDAP+Traditional → WHOIS+LLM</summary>
     WhoisFirst,
-    /// <summary>Rdap+传统优先，跳过WHOIS+传统，LLM兜底: RDAP+传统 → WHOIS+LLM</summary>
+    /// <summary>Rdap+Traditional first, skip WHOIS+Traditional, LLM as fallback: RDAP+Traditional → WHOIS+LLM</summary>
     RdapFirstWhoisLlmFallback,
-    /// <summary>仅RDAP+传统</summary>
+    /// <summary>RDAP+Traditional only</summary>
     RdapTraditionOnly,
-    /// <summary>仅WHOIS+传统</summary>
+    /// <summary>WHOIS+Traditional only</summary>
     WhoisTraditionOnly,
-    /// <summary>仅RDAP+LLM</summary>
+    /// <summary>RDAP+LLM only</summary>
     RdapLlmOnly,
-    /// <summary>仅WHOIS+LLM</summary>
+    /// <summary>WHOIS+LLM only</summary>
     WhoisLlmOnly
 }
 
 /// <summary>
-/// 查询结果
+/// Query result
 /// </summary>
 public class QueryResult
 {
@@ -39,7 +39,7 @@ public class QueryResult
 }
 
 /// <summary>
-/// 追踪条目
+/// Trace entry
 /// </summary>
 public class TraceEntry
 {
@@ -51,37 +51,37 @@ public class TraceEntry
 }
 
 /// <summary>
-/// 客户端配置
+/// Client configuration
 /// </summary>
 public class WhoisClientOptions
 {
-    /// <summary>查询策略（默认Rdap优先）</summary>
+    /// <summary>Query strategy (default: RdapFirst)</summary>
     public QueryStrategy Strategy { get; set; } = QueryStrategy.RdapFirst;
 
-    /// <summary>LLM API端点</summary>
+    /// <summary>LLM API endpoint</summary>
     public string? LlmApiEndpoint { get; set; }
 
-    /// <summary>LLM模型名称</summary>
+    /// <summary>LLM model name</summary>
     public string? LlmModel { get; set; }
 
-    /// <summary>LLM API Key（默认从环境变量DEEPSEEK_API_KEY读取）</summary>
+    /// <summary>LLM API Key (default: read from environment variable DEEPSEEK_API_KEY)</summary>
     public string? LlmApiKey { get; set; }
 
-    /// <summary>是否启用LLM思考模式（true=启用, false=禁用, null=不指定）</summary>
+    /// <summary>Enable LLM thinking mode (true=enabled, false=disabled, null=not specified)</summary>
     public bool? LlmEnableThinking { get; set; }
 
-    /// <summary>自定义缓存目录</summary>
+    /// <summary>Custom cache directory</summary>
     public string? CacheDirectory { get; set; }
 
-    /// <summary>User-Agent字符串（默认 ArashiDNS.WhoisLib/1.0）</summary>
+    /// <summary>User-Agent string (default: ArashiDNS.WhoisLib/1.0)</summary>
     public string UserAgent { get; set; } = "ArashiDNS.WhoisLib/1.0";
 
-    /// <summary>是否过滤空联系人（默认true）</summary>
+    /// <summary>Whether to filter empty contacts (default: true)</summary>
     public bool FilterEmptyContacts { get; set; } = true;
 
-    /// <summary>自定义RDAP服务器端点（覆盖自动发现）</summary>
+    /// <summary>Custom RDAP server endpoint (overrides auto-discovery)</summary>
     public string? CustomRdapEndpoint { get; set; }
 
-    /// <summary>自定义WHOIS服务器（覆盖自动发现）</summary>
+    /// <summary>Custom WHOIS server (overrides auto-discovery)</summary>
     public string? CustomWhoisServer { get; set; }
 }

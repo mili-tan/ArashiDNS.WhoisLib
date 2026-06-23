@@ -3,7 +3,7 @@ using ArashiDNS.WhoisLib.Contracts.Models;
 namespace ArashiDNS.WhoisLib;
 
 /// <summary>
-/// 快速查询入口
+/// Quick lookup entry point
 /// </summary>
 public static class Whois
 {
@@ -11,7 +11,7 @@ public static class Whois
     private static readonly object Lock = new();
 
     /// <summary>
-    /// 获取默认客户端实例
+    /// Get the default client instance
     /// </summary>
     private static WhoisLookup GetDefaultClient()
     {
@@ -26,17 +26,17 @@ public static class Whois
     }
 
     /// <summary>
-    /// 快速查询
+    /// Quick lookup
     /// </summary>
-    /// <param name="query">域名/IP/ASN</param>
-    /// <returns>查询结果</returns>
+    /// <param name="query">Domain/IP/ASN</param>
+    /// <returns>Query result</returns>
     public static async Task<QueryResult> LookupAsync(string query)
     {
         return await GetDefaultClient().QueryAsync(query);
     }
 
     /// <summary>
-    /// 使用指定选项查询
+    /// Query with specified options
     /// </summary>
     public static async Task<QueryResult> LookupAsync(string query, WhoisClientOptions options)
     {
@@ -45,7 +45,7 @@ public static class Whois
     }
 
     /// <summary>
-    /// 释放默认客户端
+    /// Dispose the default client
     /// </summary>
     public static void Dispose()
     {

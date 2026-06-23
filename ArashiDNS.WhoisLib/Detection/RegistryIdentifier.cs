@@ -4,7 +4,7 @@ using ArashiDNS.WhoisLib.Data;
 namespace ArashiDNS.WhoisLib.Detection;
 
 /// <summary>
-/// 注册局/注册商标识器
+/// Registry/Registrar identifier
 /// </summary>
 public class RegistryIdentifier
 {
