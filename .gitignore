@@ -44,3 +44,9 @@ Thumbs.db
 
 ## Cache
 .WhoisLibCache/
+
+## Node.js / Cloudflare Workers
+node_modules/
+dist/
+.wrangler/
+.dev.vars

@@ -1,0 +1,17 @@
+name = "whois-worker"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[vars]
+# API_KEY = ""                          # Optional: set to protect API with key
+# DEEPSEEK_API_KEY = ""                 # Optional: set to enable LLM formatting
+# DEEPSEEK_API_ENDPOINT = "https://api.deepseek.com/chat/completions"
+# DEEPSEEK_MODEL = "deepseek-v4-flash"
+# DEEPSEEK_ENABLE_THINKING = "false"    # Enable thinking mode (true/false)
+# DEEPSEEK_REASONING_EFFORT = "high"    # Reasoning effort: high/medium/low
+# RATE_LIMIT_RPM = "60"                 # Requests per minute per IP
+
+[[kv_namespaces]]
+binding = "A_WHOIS_CACHE_KV"
+id = "placeholder"                      # Replace with actual KV namespace ID after creation
+# preview_id = "preview_id"             # Optional: for wrangler dev

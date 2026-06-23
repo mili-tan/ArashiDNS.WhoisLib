@@ -1,0 +1,504 @@
+import { connect } from 'cloudflare:sockets';
+import type { WhoisResponse, WhoisQueryType, TraceEntry, ContactInfo, ContactCollection, DomainDates, RegistrarInfo, RegistryInfo, DnssecInfo } from './types';
+
+const MAX_REFERRALS = 5;
+const TCP_TIMEOUT_MS = 15000;
+
+const REFERRAL_REGEX = /(?:ReferralServer|Whois Server|refer|whois):\s*(?:whois:\/\/)?([^\s:\r\n]+)/i;
+
+const DATE_FORMATS = [
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z?/,
+  /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/,
+  /^(\d{4})-(\d{2})-(\d{2})$/,
+  /^(\d{2})-([A-Za-z]{3})-(\d{4})$/,
+  /^(\d{2})\.(\d{2})\.(\d{4})$/,
+  /^(\d{2})\/(\d{2})\/(\d{4})$/,
+  /^(\d{4})\.(\d{2})\.(\d{2})/,
+  /^(\d{4})\/(\d{2})\/(\d{2})/,
+  /^(\d{4})(\d{2})(\d{2})$/,
+];
+
+const MONTH_MAP: Record<string, string> = {
+  jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+  jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+};
+
+type FieldMapping = [string, string[]];
+
+const DOMAIN_FIELD_MAPPINGS: FieldMapping[] = [
+  ['domain', ['Domain Name:', 'Domain name:', 'domain name:', 'domain:', '[Domain Name]']],
+  ['registrar_name', ['Registrar:', 'Sponsoring Registrar:', 'Registrar Name:', 'Authorized Agency:']],
+  ['registrar_iana_id', ['Registrar IANA ID:', 'Registrar ID:']],
+  ['registrar_url', ['Registrar URL:', 'Registrar Website:', 'URL:']],
+  ['registrar_whois', ['Registrar WHOIS Server:', 'Whois Server:']],
+  ['created', ['Creation Date:', 'Created:', 'Created Date:', 'Registration Date:', 'Registered on:', 'Registered Date:', 'Registration Time:', 'Record created:', 'Record Created:']],
+  ['updated', ['Updated Date:', 'Modified:', 'Last Modified:', 'Last Updated:', 'Last Updated Date:', 'Record last updated on:', 'Record last updated:', 'Last Update:']],
+  ['expires', ['Registry Expiry Date:', 'Expiration Date:', 'Expires:', 'Expiry Date:', 'Registrar Registration Expiration Date:', 'Expiration Time:', 'Record expires on:', 'Record expires:', 'Expiration:']],
+  ['status', ['Domain Status:', 'Status:', 'Registration status:', 'Domain status:']],
+  ['nameserver', ['Name Server:', 'Nameserver:', 'nserver:', 'Name servers:', 'Name Servers:', 'Name servers in the listed order:', 'Nameservers:']],
+  ['registrant_name', ['Registrant Name:', 'Registrant Contact Name:', 'Registrant:', 'Name:']],
+  ['registrant_org', ['Registrant Organization:', 'Registrant Contact Organization:', 'Organization:', 'Org Name:', 'Organisation:']],
+  ['registrant_email', ['Registrant Email:', 'Registrant Contact Email:', 'Registrant Email Address:', 'AC E-Mail:', 'Email:', 'E-mail:']],
+  ['registrant_street', ['Registrant Street:', 'Registrant Contact Street:', 'Address:', 'Street:']],
+  ['registrant_city', ['Registrant City:', 'Registrant Contact City:', 'City:']],
+  ['registrant_state', ['Registrant State/Province:', 'Registrant Contact State/Province:', 'StateProv:', 'State:', 'Province:']],
+  ['registrant_postal', ['Registrant Postal Code:', 'Registrant Contact Postal Code:', 'Registrant Zip:', 'PostalCode:', 'Zip:', 'Postal Code:']],
+  ['registrant_country', ['Registrant Country:', 'Registrant Contact Country:', 'Country:', 'Country Code:']],
+  ['registrant_phone', ['Registrant Phone:', 'Registrant Contact Phone:', 'Phone:', 'phone:', 'Telephone:']],
+  ['admin_name', ['Admin Name:', 'Administrative Contact Name:', 'Admin Contact Name:', 'Admin:']],
+  ['admin_org', ['Admin Organization:', 'Administrative Contact Organization:', 'Admin Organisation:']],
+  ['admin_email', ['Admin Email:', 'Administrative Contact Email:', 'Admin E-mail:']],
+  ['admin_phone', ['Admin Phone:', 'Administrative Contact Phone:', 'Admin Telephone:']],
+  ['tech_name', ['Tech Name:', 'Technical Contact Name:', 'Tech Contact Name:', 'Technical:']],
+  ['tech_org', ['Tech Organization:', 'Technical Contact Organization:', 'Tech Organisation:']],
+  ['tech_email', ['Tech Email:', 'Technical Contact Email:', 'Tech E-mail:']],
+  ['tech_phone', ['Tech Phone:', 'Technical Contact Phone:', 'Tech Telephone:']],
+  ['registry_domain_id', ['Registry Domain ID:', 'Domain ID:', 'ROID:', 'Registry ID:']],
+  ['dnssec', ['DNSSEC:', 'DNSSEC']],
+];
+
+const IP_FIELD_MAPPINGS: FieldMapping[] = [
+  ['network_range', ['NetRange:', 'inetnum:', 'IP Address:']],
+  ['network_name', ['NetName:', 'netname:']],
+  ['organization', ['OrgName:', 'org-name:', 'org:', 'descr:']],
+  ['address', ['Address:', 'address:']],
+  ['city', ['City:']],
+  ['state', ['StateProv:']],
+  ['postal_code', ['PostalCode:']],
+  ['country', ['Country:', 'country:']],
+  ['abuse_email', ['OrgAbuseEmail:', 'abuse-mailbox:', 'e-mail:']],
+  ['abuse_phone', ['OrgAbusePhone:', 'phone:']],
+];
+
+// Sort mappings by prefix length descending for longest-match-first
+function sortMappings(mappings: FieldMapping[]): [string, string][] {
+  const flat: [string, string][] = [];
+  for (const [key, prefixes] of mappings) {
+    for (const prefix of prefixes) {
+      if (prefix) flat.push([key, prefix]);
+    }
+  }
+  return flat.sort((a, b) => b[1].length - a[1].length);
+}
+
+const SORTED_DOMAIN_MAPPINGS = sortMappings(DOMAIN_FIELD_MAPPINGS);
+const SORTED_IP_MAPPINGS = sortMappings(IP_FIELD_MAPPINGS);
+
+function extractFields(rawResponse: string, sortedMappings: [string, string][]): Map<string, string[]> {
+  const fields = new Map<string, string[]>();
+  const lines = rawResponse.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('%') || trimmed.startsWith('#')) continue;
+
+    const wordCount = trimmed.split(/\s+/).length;
+    if (wordCount > 10) continue;
+
+    for (const [key, prefix] of sortedMappings) {
+      if (trimmed.toLowerCase().startsWith(prefix.toLowerCase())) {
+        const afterPrefix = trimmed.length > prefix.length ? trimmed[prefix.length] : '';
+        if (afterPrefix === ':' || afterPrefix === ' ' || afterPrefix === '\t' || afterPrefix === '') {
+          const value = trimmed.slice(prefix.length).trim();
+          if (value) {
+            if (!fields.has(key)) fields.set(key, []);
+            fields.get(key)!.push(value);
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  return fields;
+}
+
+function getFieldValue(fields: Map<string, string[]>, key: string): string {
+  const values = fields.get(key);
+  return values && values.length > 0 ? values[0] : '';
+}
+
+function getFieldValues(fields: Map<string, string[]>, key: string): string[] {
+  return fields.get(key) || [];
+}
+
+function cleanFieldValue(value: string): string {
+  if (!value) return '';
+  value = value.trim();
+  if (value.startsWith('[') && value.endsWith(']')) {
+    value = value.slice(1, -1).trim();
+  }
+  return value;
+}
+
+function parseWhoisDate(dateStr: string): string | null {
+  if (!dateStr) return null;
+  dateStr = dateStr.split('(')[0].trim();
+  dateStr = dateStr.replace(/\s*(JST|UTC|GMT|KST)\s*$/i, '').trim();
+
+  // ISO format
+  const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  }
+
+  // dd-MMM-yyyy
+  const dmyMatch = dateStr.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})/);
+  if (dmyMatch) {
+    const month = MONTH_MAP[dmyMatch[2].toLowerCase()];
+    if (month) {
+      const d = new Date(`${dmyMatch[3]}-${month}-${dmyMatch[1]}`);
+      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+    }
+  }
+
+  // dd.MM.yyyy
+  const dotMatch = dateStr.match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+  if (dotMatch) {
+    const d = new Date(`${dotMatch[3]}-${dotMatch[2]}-${dotMatch[1]}`);
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  }
+
+  // MM/dd/yyyy
+  const usMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (usMatch) {
+    const d = new Date(`${usMatch[3]}-${usMatch[1]}-${usMatch[2]}`);
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  }
+
+  // yyyy.MM.dd
+  const ydotMatch = dateStr.match(/^(\d{4})\.(\d{2})\.(\d{2})/);
+  if (ydotMatch) {
+    const d = new Date(`${ydotMatch[1]}-${ydotMatch[2]}-${ydotMatch[3]}`);
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  }
+
+  // Korean: yyyy. MM. dd.
+  const korMatch = dateStr.match(/^(\d{4})\.\s*(\d{2})\.\s*(\d{2})/);
+  if (korMatch) {
+    const d = new Date(`${korMatch[1]}-${korMatch[2]}-${korMatch[3]}`);
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  }
+
+  // Fallback
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+
+  return null;
+}
+
+function parseStatuses(statusValues: string[]): string[] {
+  const result: string[] = [];
+  for (const val of statusValues) {
+    const parts = val.split(/[\s\t]+/);
+    for (const part of parts) {
+      const s = part.trim().toLowerCase();
+      if (s && !s.startsWith('http') && !s.startsWith('(') && !result.includes(s)) {
+        result.push(s);
+      }
+    }
+  }
+  return result;
+}
+
+function parseContact(fields: Map<string, string[]>, prefix: string): ContactInfo | null {
+  const name = cleanFieldValue(getFieldValue(fields, `${prefix}_name`));
+  const org = cleanFieldValue(getFieldValue(fields, `${prefix}_org`));
+  const email = cleanFieldValue(getFieldValue(fields, `${prefix}_email`));
+  const street = cleanFieldValue(getFieldValue(fields, `${prefix}_street`));
+  const city = cleanFieldValue(getFieldValue(fields, `${prefix}_city`));
+  const state = cleanFieldValue(getFieldValue(fields, `${prefix}_state`));
+  const postal = cleanFieldValue(getFieldValue(fields, `${prefix}_postal`));
+  const country = cleanFieldValue(getFieldValue(fields, `${prefix}_country`));
+  const phone = cleanFieldValue(getFieldValue(fields, `${prefix}_phone`));
+
+  if (!name && !org && !email) return null;
+
+  return { name, organization: org, email, phone, street, city, state, postalCode: postal, country, roles: [] };
+}
+
+function parseDnssec(fields: Map<string, string[]>): DnssecInfo | null {
+  const val = cleanFieldValue(getFieldValue(fields, 'dnssec'));
+  if (!val) return null;
+  const signed = !val.toLowerCase().includes('unsigned') && val.toLowerCase() !== 'no';
+  return { signed, delegationSigned: signed, dsData: [], keyData: [] };
+}
+
+function formatQuery(server: string, query: string, queryType: WhoisQueryType): string {
+  const lower = server.toLowerCase();
+  if (lower.includes('verisign-grs.com')) return `domain ${query}`;
+  if (lower.includes('arin.net')) {
+    if (queryType === 'ipv4' || queryType === 'ipv6') return `n + ${query}`;
+    return query;
+  }
+  return query;
+}
+
+function extractReferral(response: string): string | null {
+  const match = response.match(REFERRAL_REGEX);
+  return match ? match[1] : null;
+}
+
+function extractTld(domain: string): string {
+  const parts = domain.replace(/\.$/, '').split('.');
+  return parts.length > 0 ? parts[parts.length - 1].toLowerCase() : '';
+}
+
+// Section-based WHOIS parsing (for .kg, .cn, etc.)
+function parseSectionBasedWhois(raw: string): Partial<WhoisResponse> {
+  const lines = raw.split('\n');
+  const contacts: ContactCollection = { registrant: null, admin: null, tech: null, billing: null };
+  let currentContact: ContactInfo | null = null;
+  let currentRole: string = '';
+  const nameServers: string[] = [];
+  let inNsSection = false;
+  let domain = '';
+  const dates: DomainDates = { created: null, updated: null, expires: null };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('%') || trimmed.startsWith('#')) continue;
+
+    // Domain: "Domain AC.KG (ACTIVE)"
+    if (trimmed.toLowerCase().startsWith('domain ') && !trimmed.toLowerCase().includes('status')) {
+      const parts = trimmed.split(/\s+/);
+      if (parts.length >= 2) {
+        domain = parts[1].replace(/\.$/, '').toLowerCase();
+        if (domain.includes('(')) domain = domain.split('(')[0].trim();
+      }
+    }
+
+    // Contact sections
+    const t = trimmed.toLowerCase();
+    if (t.endsWith('contact:') || t.endsWith('contact')) {
+      currentContact = { name: '', organization: '', email: '', phone: '', street: '', city: '', state: '', postalCode: '', country: '', roles: [] };
+      if (t.includes('admin')) { contacts.admin = currentContact; currentRole = 'admin'; }
+      else if (t.includes('tech')) { contacts.tech = currentContact; currentRole = 'tech'; }
+      else if (t.includes('bill')) { contacts.billing = currentContact; currentRole = 'billing'; }
+      else { contacts.registrant = currentContact; currentRole = 'registrant'; }
+      continue;
+    }
+
+    // Contact fields
+    if (currentContact) {
+      if (trimmed.toLowerCase().startsWith('name:')) currentContact.name = trimmed.slice(5).trim();
+      else if (trimmed.toLowerCase().startsWith('address:')) currentContact.street = trimmed.slice(8).trim();
+      else if (trimmed.toLowerCase().startsWith('email:')) currentContact.email = trimmed.slice(6).trim();
+      else if (trimmed.toLowerCase().startsWith('phone:')) currentContact.phone = trimmed.slice(6).trim();
+    }
+
+    // Dates
+    if (trimmed.toLowerCase().startsWith('record created:')) {
+      dates.created = parseWhoisDate(trimmed.slice(15).trim());
+    } else if (trimmed.toLowerCase().startsWith('record last updated')) {
+      const idx = trimmed.indexOf(':');
+      dates.updated = parseWhoisDate(idx >= 0 ? trimmed.slice(idx + 1).trim() : trimmed);
+    } else if (trimmed.toLowerCase().startsWith('record expires')) {
+      const idx = trimmed.indexOf(':');
+      dates.expires = parseWhoisDate(idx >= 0 ? trimmed.slice(idx + 1).trim() : trimmed);
+    }
+
+    // Nameservers
+    if (trimmed.toLowerCase().includes('name servers') || trimmed.toLowerCase().includes('nameservers')) {
+      inNsSection = true;
+      continue;
+    }
+    if (inNsSection && trimmed) {
+      if (trimmed.toLowerCase().startsWith('ns') || trimmed.match(/\.(com|net|org)$/i)) {
+        nameServers.push(trimmed.toLowerCase());
+      } else {
+        inNsSection = false;
+      }
+    }
+  }
+
+  return { domain, contacts, nameServers, dates };
+}
+
+export class WhoisTcpClient {
+  async query(query: string, queryType: WhoisQueryType): Promise<{ response: WhoisResponse; trace: TraceEntry[] }> {
+    const traces: TraceEntry[] = [];
+    const referralChain: string[] = [];
+    let currentServer = this.getWhoisServer(query, queryType);
+    let lastRawResponse: string | null = null;
+
+    for (let i = 0; i < MAX_REFERRALS; i++) {
+      if (!currentServer) break;
+      referralChain.push(currentServer);
+
+      const trace: TraceEntry = { protocol: 'WHOIS', endpoint: currentServer, formatter: '', success: false };
+      traces.push(trace);
+
+      try {
+        const formattedQuery = formatQuery(currentServer, query, queryType);
+        const rawResponse = await this.tcpQuery(currentServer, formattedQuery);
+        lastRawResponse = rawResponse;
+        trace.success = true;
+
+        const referralServer = extractReferral(rawResponse);
+        if (!referralServer || referralChain.includes(referralServer)) break;
+
+        currentServer = referralServer;
+      } catch (ex) {
+        trace.error = (ex as Error).message;
+        if (i === 0) {
+          return { response: this.errorResponse(query, queryType, currentServer, referralChain, (ex as Error).message), trace: traces };
+        }
+        break;
+      }
+    }
+
+    if (!lastRawResponse) {
+      return { response: this.errorResponse(query, queryType, currentServer || '', referralChain, 'No response received'), trace: traces };
+    }
+
+    const response = this.parseResponse(query, queryType, lastRawResponse, referralChain);
+    return { response, trace: traces };
+  }
+
+  private getWhoisServer(query: string, queryType: WhoisQueryType): string {
+    if (queryType === 'domain') {
+      const tld = extractTld(query);
+      return `${tld}.whois-servers.net`;
+    }
+    if (queryType === 'ipv4' || queryType === 'ipv6') return 'whois.arin.net';
+    if (queryType === 'asn') return 'whois.arin.net';
+    return 'whois.iana.org';
+  }
+
+  private async tcpQuery(host: string, query: string): Promise<string> {
+    const socket = connect({ hostname: host, port: 43 });
+    const writer = socket.writable.getWriter();
+    const encoder = new TextEncoder();
+    await writer.write(encoder.encode(query + '\r\n'));
+    writer.releaseLock();
+
+    const reader = socket.readable.getReader();
+    const chunks: Uint8Array[] = [];
+    const decoder = new TextDecoder('utf-8');
+
+    let result = '';
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value && value.length > 0) {
+          chunks.push(value);
+        }
+      }
+    } catch { /* stream ended */ }
+
+    try { reader.releaseLock(); } catch {}
+
+    // Combine all chunks
+    const totalLen = chunks.reduce((acc, c) => acc + c.length, 0);
+    if (totalLen === 0) {
+      try { await socket.close(); } catch {}
+      return '';
+    }
+
+    const bytes = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+
+    try { await socket.close(); } catch {}
+
+    // Try UTF-8, fallback to Latin1
+    try {
+      const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      if (!text.includes('\uFFFD')) return text;
+    } catch {}
+    return new TextDecoder('latin1').decode(bytes);
+  }
+
+  private parseResponse(query: string, queryType: WhoisQueryType, rawResponse: string, referralChain: string[]): WhoisResponse {
+    const base: WhoisResponse = {
+      query, queryType, domain: '', isSuccessful: true,
+      whoisServer: referralChain[0] || '', port43: referralChain[referralChain.length - 1] || '',
+      rawResponse, referralChain, errorMessage: null,
+      statuses: [], nameServers: [], dates: null,
+      contacts: { registrant: null, admin: null, tech: null, billing: null },
+      registrar: null, registry: null, privacy: null, dnssec: null,
+    };
+
+    if (queryType === 'ipv4' || queryType === 'ipv6' || queryType === 'asn') {
+      const fields = extractFields(rawResponse, SORTED_IP_MAPPINGS);
+      base.domain = cleanFieldValue(getFieldValue(fields, 'network_range')) || query;
+      base.registry = {
+        name: cleanFieldValue(getFieldValue(fields, 'organization')),
+        website: '', whoisServer: referralChain[0] || '',
+      };
+      const org = cleanFieldValue(getFieldValue(fields, 'organization'));
+      const email = cleanFieldValue(getFieldValue(fields, 'abuse_email'));
+      const country = cleanFieldValue(getFieldValue(fields, 'country'));
+      if (org || email) {
+        base.contacts.registrant = {
+          name: '', organization: org, email, phone: cleanFieldValue(getFieldValue(fields, 'abuse_phone')),
+          street: cleanFieldValue(getFieldValue(fields, 'address')),
+          city: cleanFieldValue(getFieldValue(fields, 'city')),
+          state: cleanFieldValue(getFieldValue(fields, 'state')),
+          postalCode: cleanFieldValue(getFieldValue(fields, 'postal_code')),
+          country, roles: ['registrant'],
+        };
+      }
+      return base;
+    }
+
+    // Domain parsing
+    const fields = extractFields(rawResponse, SORTED_DOMAIN_MAPPINGS);
+    base.domain = cleanFieldValue(getFieldValue(fields, 'domain')) || query.toUpperCase();
+
+    base.dates = {
+      created: parseWhoisDate(getFieldValue(fields, 'created')),
+      updated: parseWhoisDate(getFieldValue(fields, 'updated')),
+      expires: parseWhoisDate(getFieldValue(fields, 'expires')),
+    };
+
+    base.nameServers = getFieldValues(fields, 'nameserver').map(v => cleanFieldValue(v).toLowerCase()).filter(Boolean);
+    base.statuses = parseStatuses(getFieldValue(fields, 'status') ? [getFieldValue(fields, 'status')] : getFieldValues(fields, 'status'));
+    base.dnssec = parseDnssec(fields);
+
+    const regName = cleanFieldValue(getFieldValue(fields, 'registrar_name'));
+    if (regName) {
+      base.registrar = {
+        name: regName,
+        ianaId: cleanFieldValue(getFieldValue(fields, 'registrar_iana_id')),
+        website: cleanFieldValue(getFieldValue(fields, 'registrar_url')),
+        whoisServer: cleanFieldValue(getFieldValue(fields, 'registrar_whois')),
+      };
+    }
+
+    base.contacts.registrant = parseContact(fields, 'registrant');
+    base.contacts.admin = parseContact(fields, 'admin');
+    base.contacts.tech = parseContact(fields, 'tech');
+
+    // Section-based fallback
+    if (!base.domain || (!base.registrar?.name && !base.dates?.expires)) {
+      const section = parseSectionBasedWhois(rawResponse);
+      if (section.domain && base.domain === query.toUpperCase()) base.domain = section.domain;
+      if (!base.dates?.expires && section.dates?.expires) base.dates = section.dates;
+      if (!base.registrar?.name && section.registrar) base.registrar = section.registrar;
+      if (base.nameServers.length === 0 && section.nameServers && section.nameServers.length > 0) base.nameServers = section.nameServers;
+      if (!base.contacts.registrant && section.contacts?.registrant) base.contacts.registrant = section.contacts.registrant;
+      if (!base.contacts.admin && section.contacts?.admin) base.contacts.admin = section.contacts.admin;
+      if (!base.contacts.tech && section.contacts?.tech) base.contacts.tech = section.contacts.tech;
+    }
+
+    // Set roles
+    if (base.contacts.registrant) base.contacts.registrant.roles = ['registrant'];
+    if (base.contacts.admin) base.contacts.admin.roles = ['admin'];
+    if (base.contacts.tech) base.contacts.tech.roles = ['tech'];
+
+    return base;
+  }
+
+  private errorResponse(query: string, queryType: WhoisQueryType, server: string, referralChain: string[], error: string): WhoisResponse {
+    return {
+      query, queryType, domain: '', isSuccessful: false, errorMessage: error,
+      whoisServer: server, port43: null, statuses: [], nameServers: [], dates: null,
+      contacts: { registrant: null, admin: null, tech: null, billing: null },
+      registrar: null, registry: null, privacy: null, dnssec: null, rawResponse: null, referralChain,
+    };
+  }
+}
