@@ -90,6 +90,7 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
   const raw = url.searchParams.get('raw') === '1';
   const trace = url.searchParams.get('trace') === '1';
   const useLlm = url.searchParams.get('llm') === '1';
+  const showEmpty = url.searchParams.get('show_empty') === '1';
   const mode = url.searchParams.get('mode') || 'auto'; // auto | rdap | whois
 
   const queryType = detectQueryType(query);
@@ -202,7 +203,7 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
     ...(trace ? { trace: traceEntries } : {}),
   };
 
-  return jsonResponse(result, 200, origin);
+  return jsonResponse(showEmpty ? result : stripEmpty(result), 200, origin);
 }
 
 interface RawContactCollection {
@@ -241,6 +242,25 @@ function mergeContacts(contacts: RawContactCollection): ContactInfo[] {
 
 function contactHash(c: ContactInfo): string {
   return [c.name, c.organization, c.email, c.phone, c.street, c.city, c.state, c.postalCode, c.country].join('|');
+}
+
+function stripEmpty(obj: unknown): unknown {
+  if (Array.isArray(obj)) {
+    const arr = obj.map(stripEmpty).filter(v => v !== undefined && v !== null && v !== '');
+    return arr.length > 0 ? arr : undefined;
+  }
+  if (obj && typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      const stripped = stripEmpty(v);
+      if (stripped !== undefined && stripped !== null && stripped !== '') {
+        result[k] = stripped;
+      }
+    }
+    return Object.keys(result).length > 0 ? result : undefined;
+  }
+  if (obj === '' || obj === null) return undefined;
+  return obj;
 }
 
 export default {

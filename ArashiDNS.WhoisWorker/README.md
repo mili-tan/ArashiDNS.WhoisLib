@@ -33,6 +33,7 @@ GET /?asn=13335
 | `raw=1` | Include raw RDAP/WHOIS response |
 | `trace=1` | Include query trace |
 | `llm=1` | Enable LLM parsing (requires API key) |
+| `show_empty=1` | Show null/empty fields in response (stripped by default) |
 
 ### Response
 
