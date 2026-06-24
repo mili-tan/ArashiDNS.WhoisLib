@@ -50,3 +50,7 @@ node_modules/
 dist/
 .wrangler/
 .dev.vars
+
+## Agent Skills
+.agents/
+skills-lock.json
