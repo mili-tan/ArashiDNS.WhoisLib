@@ -93,15 +93,15 @@ const DOMAIN_FIELD_MAPPINGS: FieldMapping[] = [
   ['registrar_iana_id', ['Registrar IANA ID:', 'Registrar ID:']],
   ['registrar_url', ['Registrar URL:', 'Registrar Website:', 'URL:']],
   ['registrar_whois', ['Registrar WHOIS Server:', 'Whois Server:']],
-  ['created', ['Creation Date:', 'Created:', 'Created Date:', 'Registration Date:', 'Registered on:', 'Registered Date:', 'Registration Time:', 'Record created:', 'Record Created:']],
-  ['updated', ['Updated Date:', 'Modified:', 'Last Modified:', 'Last Updated:', 'Last Updated Date:', 'Record last updated on:', 'Record last updated:', 'Last Update:']],
+  ['created', ['Creation Date:', 'Created:', 'Created Date:', 'Created On:', 'Registration Date:', 'Registered on:', 'Registered Date:', 'Registration Time:', 'Record created:', 'Record Created:']],
+  ['updated', ['Updated Date:', 'Modified:', 'Last Modified:', 'Last Updated:', 'Last Updated On:', 'Last Updated Date:', 'Record last updated on:', 'Record last updated:', 'Last Update:']],
   ['expires', ['Registry Expiry Date:', 'Expiration Date:', 'Expires:', 'Expiry Date:', 'Registrar Registration Expiration Date:', 'Expiration Time:', 'Record expires on:', 'Record expires:', 'Expiration:']],
   ['status', ['Domain Status:', 'Status:', 'Registration status:', 'Domain status:']],
   ['nameserver', ['Name Server:', 'Nameserver:', 'nserver:', 'Name servers:', 'Name Servers:', 'Name servers in the listed order:', 'Nameservers:']],
   ['registrant_name', ['Registrant Name:', 'Registrant Contact Name:', 'Registrant:', 'Name:']],
   ['registrant_org', ['Registrant Organization:', 'Registrant Contact Organization:', 'Organization:', 'Org Name:', 'Organisation:']],
   ['registrant_email', ['Registrant Email:', 'Registrant Contact Email:', 'Registrant Email Address:', 'AC E-Mail:', 'Email:', 'E-mail:']],
-  ['registrant_street', ['Registrant Street:', 'Registrant Contact Street:', 'Address:', 'Street:']],
+  ['registrant_street', ['Registrant Street:', 'Registrant Street1:', 'Registrant Contact Street:', 'Address:', 'Street:']],
   ['registrant_city', ['Registrant City:', 'Registrant Contact City:', 'City:']],
   ['registrant_state', ['Registrant State/Province:', 'Registrant Contact State/Province:', 'StateProv:', 'State:', 'Province:']],
   ['registrant_postal', ['Registrant Postal Code:', 'Registrant Contact Postal Code:', 'Registrant Zip:', 'PostalCode:', 'Zip:', 'Postal Code:']],
@@ -159,15 +159,12 @@ function extractFields(rawResponse: string, sortedMappings: [string, string][]):
 
     for (const [key, prefix] of sortedMappings) {
       if (trimmed.toLowerCase().startsWith(prefix.toLowerCase())) {
-        const afterPrefix = trimmed.length > prefix.length ? trimmed[prefix.length] : '';
-        if (afterPrefix === ':' || afterPrefix === ' ' || afterPrefix === '\t' || afterPrefix === '') {
-          const value = trimmed.slice(prefix.length).trim();
-          if (value) {
-            if (!fields.has(key)) fields.set(key, []);
-            fields.get(key)!.push(value);
-          }
-          break;
+        const value = trimmed.slice(prefix.length).trim();
+        if (value) {
+          if (!fields.has(key)) fields.set(key, []);
+          fields.get(key)!.push(value);
         }
+        break;
       }
     }
   }
