@@ -4,6 +4,68 @@ import type { WhoisResponse, WhoisQueryType, TraceEntry, ContactInfo, ContactCol
 const MAX_REFERRALS = 5;
 const TCP_TIMEOUT_MS = 15000;
 
+// SLD WHOIS servers (from sld.csv)
+const SLD_WHOIS_SERVERS: Record<string, string> = {
+  'br.com': 'whois.centralnic.net',
+  'cn.com': 'whois.centralnic.net',
+  'de.com': 'whois.centralnic.net',
+  'eu.com': 'whois.centralnic.net',
+  'gb.com': 'whois.centralnic.net',
+  'gb.net': 'whois.centralnic.net',
+  'gr.com': 'whois.centralnic.net',
+  'hu.com': 'whois.centralnic.net',
+  'in.net': 'whois.centralnic.net',
+  'no.com': 'whois.centralnic.net',
+  'qc.com': 'whois.centralnic.net',
+  'ru.com': 'whois.centralnic.net',
+  'sa.com': 'whois.centralnic.net',
+  'se.com': 'whois.centralnic.net',
+  'se.net': 'whois.centralnic.net',
+  'uk.com': 'whois.centralnic.net',
+  'uk.net': 'whois.centralnic.net',
+  'us.com': 'whois.centralnic.net',
+  'uy.com': 'whois.centralnic.net',
+  'za.com': 'whois.centralnic.net',
+  'jpn.com': 'whois.centralnic.net',
+  'web.com': 'whois.centralnic.net',
+  'za.net': 'whois.za.net',
+  'eu.org': 'whois.eu.org',
+  'za.org': 'whois.za.org',
+  'llyw.cymru': 'whois.nic.llyw.cymru',
+  'gov.scot': 'whois.nic.gov.scot',
+  'gov.wales': 'whois.nic.gov.wales',
+  'e164.arpa': 'whois.ripe.net',
+  'priv.at': 'whois.nic.priv.at',
+  'co.ca': 'whois.co.ca',
+  'edu.cn': 'whois.edu.cn',
+  'uk.co': 'whois.uk.co',
+  'co.pl': 'whois.co.pl',
+  'ac.ru': 'whois.free.net',
+  'edu.ru': 'whois.informika.ru',
+  'com.ru': 'whois.flexireg.net',
+  'msk.ru': 'whois.flexireg.net',
+  'net.ru': 'whois.nic.net.ru',
+  'nov.ru': 'whois.flexireg.net',
+  'org.ru': 'whois.nic.net.ru',
+  'pp.ru': 'whois.nic.net.ru',
+  'spb.ru': 'whois.flexireg.net',
+  'msk.su': 'whois.flexireg.net',
+  'nov.su': 'whois.flexireg.net',
+  'spb.su': 'whois.flexireg.net',
+  'biz.ua': 'whois.biz.ua',
+  'co.ua': 'whois.co.ua',
+  'pp.ua': 'whois.pp.ua',
+  'ac.uk': 'whois.nic.ac.uk',
+  'gov.uk': 'whois.gov.uk',
+  'fed.us': 'whois.nic.gov',
+  'ac.za': 'whois.ac.za',
+  'co.za': 'whois.registry.net.za',
+  'gov.za': 'whois.gov.za',
+  'net.za': 'net-whois.registry.net.za',
+  'org.za': 'org-whois.registry.net.za',
+  'web.za': 'web-whois.registry.net.za',
+};
+
 const REFERRAL_REGEX = /(?:ReferralServer|Whois Server|refer|whois):\s*(?:whois:\/\/)?([^\s:\r\n]+)/i;
 
 const DATE_FORMATS = [
@@ -359,6 +421,14 @@ export class WhoisTcpClient {
 
   private getWhoisServer(query: string, queryType: WhoisQueryType): string {
     if (queryType === 'domain') {
+      const domain = query.toLowerCase().replace(/\.$/, '');
+      // Check SLD first (e.g. google.co.uk -> co.uk)
+      const parts = domain.split('.');
+      for (let i = 1; i < parts.length; i++) {
+        const sld = parts.slice(i).join('.');
+        if (SLD_WHOIS_SERVERS[sld]) return SLD_WHOIS_SERVERS[sld];
+      }
+      // Fallback to TLD
       const tld = extractTld(query);
       return `${tld}.whois-servers.net`;
     }
