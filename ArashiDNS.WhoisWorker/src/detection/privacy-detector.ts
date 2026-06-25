@@ -1,4 +1,4 @@
-import type { WhoisResponse, PrivacyInfo } from './types';
+import type { WhoisResponse, PrivacyInfo } from '../types';
 
 const PRIVACY_KEYWORDS = [
   'redacted for privacy', 'redacted for gdpr', 'data protected',

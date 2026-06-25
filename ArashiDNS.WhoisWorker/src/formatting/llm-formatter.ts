@@ -1,4 +1,4 @@
-import type { FormattedResult, Env } from './types';
+import type { FormattedResult, Env } from '../types';
 
 const SYSTEM_PROMPT = `You are a WHOIS data parser assistant. Your task is to parse raw WHOIS/RDAP response data and output structured JSON.
 

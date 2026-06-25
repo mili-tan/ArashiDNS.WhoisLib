@@ -1,10 +1,10 @@
 import type { Env, FormattedResult, TraceEntry, ContactInfo, WhoisResponse } from './types';
-import { RdapClient, detectQueryType } from './rdap-client';
-import { WhoisTcpClient } from './whois-tcp-client';
-import { BootstrapProvider } from './bootstrap-provider';
-import { RegistrarProvider, identifyRegistry, identifyRegistrar } from './registry-identifier';
-import { detectPrivacy } from './privacy-detector';
-import { LlmFormatter } from './llm-formatter';
+import { RdapClient, detectQueryType } from './core/rdap-client';
+import { WhoisTcpClient } from './core/whois-client';
+import { BootstrapProvider } from './data/bootstrap-provider';
+import { RegistrarProvider, identifyRegistry, identifyRegistrar } from './data/registry-identifier';
+import { detectPrivacy } from './detection/privacy-detector';
+import { LlmFormatter } from './formatting/llm-formatter';
 
 function corsHeaders(origin: string | null): Record<string, string> {
   return {

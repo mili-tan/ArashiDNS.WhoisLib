@@ -140,21 +140,24 @@ curl "https://your-worker.dev/?domain=example.com&key=YOUR_KEY"
 
 ```
 ArashiDNS.WhoisWorker/
-├── wrangler.toml              # Worker configuration
+├── wrangler.toml                   # Worker configuration
 ├── package.json
 ├── tsconfig.json
 └── src/
-    ├── index.ts               # HTTP entry, routing, auth, rate limiting
-    ├── types.ts               # TypeScript type definitions
-    ├── rdap-client.ts         # RDAP query + referral following
-    ├── rdap-parser.ts         # RDAP JSON/vCard parser
-    ├── whois-tcp-client.ts    # WHOIS TCP query + referral following
-    ├── bootstrap-provider.ts  # IANA RDAP endpoint discovery (KV cached)
-    ├── tld-registry.ts        # TLD->Registry static dictionary (1542 entries)
-    ├── registry-identifier.ts # Registry/Registrar identification
-    ├── registrar-provider.ts  # IANA Registrar CSV (KV cached)
-    ├── privacy-detector.ts    # Privacy protection detection
-    └── llm-formatter.ts       # LLM parsing integration (Thinking supported)
+    ├── index.ts                    # HTTP entry, routing, auth, rate limiting
+    ├── types.ts                    # TypeScript type definitions (Contracts/Models)
+    ├── core/
+    │   ├── rdap-client.ts          # RDAP query + referral following (RdapClient)
+    │   ├── rdap-parser.ts          # RDAP JSON/vCard parser (RdapResponseParser)
+    │   └── whois-client.ts         # WHOIS TCP query + referral (WhoisClient)
+    ├── data/
+    │   ├── bootstrap-provider.ts   # IANA RDAP endpoint discovery (RdapBootstrapProvider)
+    │   ├── tld-registry.ts         # TLD->Registry static dictionary (TldRegistryProvider)
+    │   └── registry-identifier.ts  # Registry/Registrar identification (RegistryIdentifier + RegistrarProvider)
+    ├── detection/
+    │   └── privacy-detector.ts     # Privacy protection detection (PrivacyDetector)
+    └── formatting/
+        └── llm-formatter.ts        # LLM parsing integration (LlmFormatter)
 ```
 
 ## Limitations

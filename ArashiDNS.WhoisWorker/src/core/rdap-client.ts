@@ -1,7 +1,7 @@
-import type { WhoisResponse, WhoisQueryType, TraceEntry } from './types';
+import type { WhoisResponse, WhoisQueryType, TraceEntry } from '../types';
 import { RdapParser } from './rdap-parser';
-import { BootstrapProvider } from './bootstrap-provider';
-import { TLD_REGISTRY } from './tld-registry';
+import { BootstrapProvider } from '../data/bootstrap-provider';
+import { TLD_REGISTRY } from '../data/tld-registry';
 
 export class RdapClient {
   private parser: RdapParser;

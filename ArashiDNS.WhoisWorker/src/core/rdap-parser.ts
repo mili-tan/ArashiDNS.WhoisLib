@@ -1,4 +1,4 @@
-import type { WhoisResponse, ContactCollection, ContactInfo, RegistrarInfo, DomainDates, DnssecInfo, WhoisQueryType } from './types';
+import type { WhoisResponse, ContactCollection, ContactInfo, RegistrarInfo, DomainDates, DnssecInfo, WhoisQueryType } from '../types';
 
 export class RdapParser {
   parse(query: string, queryType: WhoisQueryType, rawJson: string, endpoint: string): WhoisResponse {

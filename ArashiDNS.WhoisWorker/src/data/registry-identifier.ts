@@ -1,4 +1,4 @@
-import type { WhoisResponse, RegistryInfo, RegistrarInfo, RegistrarEntry, Env } from './types';
+import type { WhoisResponse, RegistryInfo, RegistrarInfo, RegistrarEntry, Env } from '../types';
 import { TLD_REGISTRY } from './tld-registry';
 
 const REGISTRARS_URL = 'https://www.iana.org/assignments/registrar-ids/registrar-ids.xhtml';

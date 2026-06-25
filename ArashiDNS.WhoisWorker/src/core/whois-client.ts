@@ -1,5 +1,5 @@
 import { connect } from 'cloudflare:sockets';
-import type { WhoisResponse, WhoisQueryType, TraceEntry, ContactInfo, ContactCollection, DomainDates, RegistrarInfo, RegistryInfo, DnssecInfo } from './types';
+import type { WhoisResponse, WhoisQueryType, TraceEntry, ContactInfo, ContactCollection, DomainDates, RegistrarInfo, RegistryInfo, DnssecInfo } from '../types';
 
 const MAX_REFERRALS = 5;
 const TCP_TIMEOUT_MS = 15000;
