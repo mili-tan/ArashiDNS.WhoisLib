@@ -29,36 +29,36 @@ public class TraditionalFormatter : IWhoisFormatter
         // Domain
         ["domain"] = ["Domain Name:", "Domain name:", "domain name:", "domain:", "[Domain Name]", "Domain ", "Complete Domain Name:", "Nome de domínio / Domain Name:"],
         ["registry_domain_id"] = ["Registry Domain ID:", "Domain ID:", "ROID:", "Registry ID:"],
-        ["registrar_name"] = ["Registrar:", "Sponsoring Registrar:", "Registrar Name:", "Authorized Agency:", "Sponsoring Registrar Organization:", "Last Updated by Registrar:", "Registrar ID:"],
+        ["registrar_name"] = ["Registrar:", "Sponsoring Registrar:", "Registrar Name:", "Authorized Agency:", "Sponsoring Registrar Organization:", "Last Updated by Registrar:", "Registrar ID:", "등록대행자:"],
         ["registrar_iana_id"] = ["Registrar IANA ID:", "Registrar ID:", "Sponsoring Registrar IANA ID:"],
         ["registrar_url"] = ["Registrar URL:", "Registrar Website:", "URL:", "Sponsoring Registrar URL:", "Sponsoring Registrar Website:", "Referral URL:", "Registrar URL (registration services):", "Registration URL:"],
         ["registrar_whois"] = ["Registrar WHOIS Server:", "Whois Server:", "WHOIS Server:", "Sponsoring Registrar WHOIS Server:"],
         ["registrar_abuse_email"] = ["Registrar Abuse Contact Email:", "Sponsoring Registrar Customer Service Email:"],
         ["registrar_abuse_phone"] = ["Registrar Abuse Contact Phone:", "Sponsoring Registrar Phone:", "Sponsoring Registrar Customer Service Contact:", "Registrar Contact Information:"],
-        ["created"] = ["Creation Date:", "Created:", "Created Date:", "Created On:", "Domain Create Date:", "Registration Date:", "Registered on:", "Registered Date:", "Registration Time:", "Record created:", "Record Created:", "created:", "registered:", "Domain Registration Date:", "Domain record activated:", "Domain Name Commencement Date:", "[Registered Date]:", "[Created on]:", "Data de registo / Creation Date:", "Record created on:"],
-        ["updated"] = ["Updated Date:", "Modified:", "Last Modified:", "Last Updated:", "Last Updated On:", "Domain Last Updated Date:", "Last Updated Date:", "Record last updated on:", "Record last updated:", "Last Update:", "last-update:", "changed:", "[Last Update]:", "[Last Updated]:", "modified:", "Domain record last updated:", "Record changed on:"],
-        ["expires"] = ["Registry Expiry Date:", "Expiration Date:", "Expires:", "Expiry Date:", "Expiry date:", "Expiry:", "expire:", "Registrar Registration Expiration Date:", "Domain Expiration Date:", "Expiration Time:", "Record expires on:", "Record expires:", "Expiration:", "expires:", "Domain expires:", "[Expires on]:", "Data de expiração / Expiration Date:", "Expired:"],
-        ["status"] = ["Domain Status:", "Status:", "Registration status:", "Domain status:", "status:", "[State]:", "[Status]:", "state:", "Estado / Status:", "Re-registration Status:"],
-        ["nameserver"] = ["Name Server:", "Nameserver:", "nserver:", "Name servers:", "Name Servers:", "Name servers in the listed order:", "Nameservers:", "Nserver:", "DNS:", "Host Name:", "[Name Server]:", "Domain nameservers:", "Domain servers:", "Domain servers in listed order:", "Nameserver Information:", "Primary Server Hostname:", "Secondary Server Hostname:"],
+        ["created"] = ["Creation Date:", "Created:", "Created Date:", "Created On:", "Domain Create Date:", "Registration Date:", "Registered on:", "Registered Date:", "Registration Time:", "Record created:", "Record Created:", "created:", "registered:", "Domain Registration Date:", "Domain record activated:", "Domain Name Commencement Date:", "[Registered Date]:", "[Created on]:", "Data de registo / Creation Date:", "Record created on:", "[登録年月日]", "등록일:"],
+        ["updated"] = ["Updated Date:", "Modified:", "Last Modified:", "Last Updated:", "Last Updated On:", "Domain Last Updated Date:", "Last Updated Date:", "Record last updated on:", "Record last updated:", "Last Update:", "last-update:", "changed:", "[Last Update]:", "[Last Updated]:", "modified:", "Domain record last updated:", "Record changed on:", "[最終更新]", "최근 정보 변경일:"],
+        ["expires"] = ["Registry Expiry Date:", "Expiration Date:", "Expires:", "Expiry Date:", "Expiry date:", "Expiry:", "expire:", "Registrar Registration Expiration Date:", "Domain Expiration Date:", "Expiration Time:", "Record expires on:", "Record expires:", "Expiration:", "expires:", "Domain expires:", "[Expires on]:", "[有効期限]", "Data de expiração / Expiration Date:", "Expired:", "사용 종료일:"],
+        ["status"] = ["Domain Status:", "Status:", "Registration status:", "Domain status:", "status:", "[State]:", "[Status]:", "state:", "Estado / Status:", "Re-registration Status:", "[状態]", "[ロック状態]", "등록정보 보호:"],
+        ["nameserver"] = ["Name Server:", "Nameserver:", "nserver:", "Name servers:", "Name Servers:", "Name servers in the listed order:", "Nameservers:", "Nserver:", "DNS:", "Host Name:", "[Name Server]", "Domain nameservers:", "Domain servers:", "Domain servers in listed order:", "Nameserver Information:", "Primary Server Hostname:", "Secondary Server Hostname:"],
 
         // Registrant
         ["registrant_id"] = ["Registrant ID:", "Registrant Contact ID:"],
-        ["registrant_name"] = ["Registrant Name:", "Registrant Contact Name:", "Registrant:", "Name:", "person:", "contact:", "[Registrant]:", "Titular / Registrant:", "holder:", "holder-c:", "Organization Using Domain Name:", "Nombre:"],
+        ["registrant_name"] = ["Registrant Name:", "Registrant Contact Name:", "Registrant:", "Name:", "person:", "contact:", "[Registrant]:", "[Registrant]", "Titular / Registrant:", "holder:", "holder-c:", "Organization Using Domain Name:", "Nombre:", "[登録者名]", "[名前]", "[Name]", "등록인:"],
         ["registrant_org"] = ["Registrant Organization:", "Registrant Contact Organization:", "Organization:", "Org Name:", "Organisation:", "descr:", "role:", "Organization Name:", "Company English Name:", "org:"],
-        ["registrant_email"] = ["Registrant Email:", "Registrant Contact Email:", "Registrant Email Address:", "Registrant E-mail:", "AC E-Mail:", "Email:", "E-mail:", "e-mail:", "Registrant Contact Email:", "E-Mailbox:", "Email Address:"],
-        ["registrant_street"] = ["Registrant Street:", "Registrant Street1:", "Registrant Street2:", "Registrant Address:", "Registrant Address1:", "Registrant Address2:", "Registrant Address3:", "Registrant Contact Street:", "Address:", "Street:", "address:", "Registrant's address:", "Registrant Address:", "street address:"],
+        ["registrant_email"] = ["Registrant Email:", "Registrant Contact Email:", "Registrant Email Address:", "Registrant E-mail:", "AC E-Mail:", "Email:", "E-mail:", "e-mail:", "Registrant Contact Email:", "E-Mailbox:", "Email Address:", "[Email]"],
+        ["registrant_street"] = ["Registrant Street:", "Registrant Street1:", "Registrant Street2:", "Registrant Address:", "Registrant Address1:", "Registrant Address2:", "Registrant Address3:", "Registrant Contact Street:", "Address:", "Street:", "address:", "Registrant's address:", "Registrant Address:", "street address:", "[住所]", "[Postal Address]", "등록인 주소:"],
         ["registrant_city"] = ["Registrant City:", "Registrant Contact City:", "City:", "city:"],
         ["registrant_state"] = ["Registrant State/Province:", "Registrant Contact State/Province:", "StateProv:", "State:", "Province:"],
-        ["registrant_postal"] = ["Registrant Postal Code:", "Registrant Contact Postal Code:", "Registrant Zip:", "PostalCode:", "Zip:", "Postal Code:", "Registrant Zip Code:", "postal code:"],
+        ["registrant_postal"] = ["Registrant Postal Code:", "Registrant Contact Postal Code:", "Registrant Zip:", "PostalCode:", "Zip:", "Postal Code:", "Registrant Zip Code:", "postal code:", "[郵便番号]", "Registrant Zip Code:", "등록인 우편번호:"],
         ["registrant_country"] = ["Registrant Country:", "Registrant Contact Country:", "Country:", "Country Code:", "country:", "Registrant Country/Economy:"],
-        ["registrant_phone"] = ["Registrant Phone:", "Registrant Contact Phone:", "Phone:", "phone:", "Telephone:", "Registrant Phone Number:", "TEL:", "Phone Number:"],
+        ["registrant_phone"] = ["Registrant Phone:", "Registrant Contact Phone:", "Phone:", "phone:", "Telephone:", "Registrant Phone Number:", "TEL:", "Phone Number:", "[電話番号]"],
         ["registrant_phone_ext"] = ["Registrant Phone Ext:", "Registrant Phone Ext.:"],
-        ["registrant_fax"] = ["Registrant Fax:", "Registrant FAX:", "Registrant Fax Ext:", "Registrant FAX Ext.:", "Registrant Facsimile Number:", "Fax:", "fax-no:", "FAX:", "Fax Number:"],
+        ["registrant_fax"] = ["Registrant Fax:", "Registrant FAX:", "Registrant Fax Ext:", "Registrant FAX Ext.:", "Registrant Facsimile Number:", "Fax:", "fax-no:", "FAX:", "Fax Number:", "[FAX番号]"],
         ["admin_id"] = ["Admin ID:", "Administrative Contact ID:"],
-        ["admin_name"] = ["Admin Name:", "Administrative Contact Name:", "Admin Contact Name:", "Admin:", "Administrative Contact:", "[Administrative Contact]:", "admin-c:", "Administrative Name", "Administrative Contact:"],
+        ["admin_name"] = ["Admin Name:", "Administrative Contact Name:", "Admin Contact Name:", "Admin:", "Administrative Contact:", "[Administrative Contact]", "admin-c:", "Administrative Name", "Administrative Contact(AC):", "책임자:"],
         ["admin_org"] = ["Admin Organization:", "Administrative Contact Organization:", "Admin Organisation:", "Administrative Organization:"],
-        ["admin_email"] = ["Admin Email:", "Administrative Contact Email:", "Admin E-mail:", "Administrative Contact Email:", "AC E-Mail:", "Administrative Email:", "Administrative E-mail:"],
-        ["admin_phone"] = ["Admin Phone:", "Administrative Contact Phone:", "Admin Telephone:", "Administrative Contact Phone Number:", "AC Phone Number:", "Administrative Phone:"],
+        ["admin_email"] = ["Admin Email:", "Administrative Contact Email:", "Admin E-mail:", "Administrative Contact Email:", "AC E-Mail:", "Administrative Email:", "Administrative E-mail:", "책임자 전자우편:"],
+        ["admin_phone"] = ["Admin Phone:", "Administrative Contact Phone:", "Admin Telephone:", "Administrative Contact Phone Number:", "AC Phone Number:", "Administrative Phone:", "책임자 전화번호:"],
         ["admin_phone_ext"] = ["Admin Phone Ext:", "Administrative Phone Ext.:"],
         ["admin_fax"] = ["Admin Fax:", "Admin FAX:", "Admin Fax Ext:", "Admin FAX Ext.:", "Administrative Contact Facsimile Number:", "Administrative FAX:", "Administrative FAX Ext.:"],
         ["admin_street"] = ["Admin Street:", "Admin Street1:", "Admin Street2:", "Admin Address:", "Admin Address1:", "Admin Address2:", "Admin Address3:", "Administrative Contact Address1:", "Administrative Contact Address2:", "Administrative Address:", "Administrative Address2:", "Administrative Address3:"],
@@ -67,7 +67,7 @@ public class TraditionalFormatter : IWhoisFormatter
         ["admin_postal"] = ["Admin Postal Code:", "Administrative Contact Postal Code:", "Administrative Postal Code:"],
         ["admin_country"] = ["Admin Country:", "Administrative Contact Country:", "Administrative Contact Country Code:", "Administrative Country/Economy:"],
         ["tech_id"] = ["Tech ID:", "Technical Contact ID:", "Tech Contact ID:", "Technical ID:"],
-        ["tech_name"] = ["Tech Name:", "Technical Contact Name:", "Tech Contact Name:", "Technical:", "Technical Contact:", "n. [Technical Contact]:", "tech-c:", "Technical Name:"],
+        ["tech_name"] = ["Tech Name:", "Technical Contact Name:", "Tech Contact Name:", "Technical:", "Technical Contact:", "[Technical Contact]", "tech-c:", "Technical Name:"],
         ["tech_org"] = ["Tech Organization:", "Technical Contact Organization:", "Tech Organisation:", "Technical Contact Organization:", "Responsável Técnico:", "Technical Organization:"],
         ["tech_email"] = ["Tech Email:", "Technical Contact Email:", "Tech E-mail:", "Technical Contact Email:", "Tech Contact Email:", "Technical E-mail:"],
         ["tech_phone"] = ["Tech Phone:", "Technical Contact Phone:", "Tech Telephone:", "Technical Contact Phone Number:", "Technical Phone:"],
@@ -90,7 +90,7 @@ public class TraditionalFormatter : IWhoisFormatter
         ["billing_state"] = ["Billing State/Province:", "Billing Contact State/Province:", "Billing State/Province:"],
         ["billing_postal"] = ["Billing Postal Code:", "Billing Contact Postal Code:", "Billing Postal Code:"],
         ["billing_country"] = ["Billing Country:", "Billing Contact Country:", "Billing Contact Country Code:", "Billing Country/Economy:"],
-        ["dnssec"] = ["DNSSEC:", "DNSSEC", "dnssec:"],
+        ["dnssec"] = ["DNSSEC:", "DNSSEC", "dnssec:", "[Signing Key]"],
         ["trademark_name"] = ["Trademark Name:"],
         ["trademark_date"] = ["Trademark Date:"],
         ["trademark_country"] = ["Trademark Country:"],
@@ -286,17 +286,44 @@ public class TraditionalFormatter : IWhoisFormatter
             {
                 var prefix = mapping.Prefix;
                 
-                // Case-insensitive prefix matching
-                if (trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                // Handle [FieldName] bracket format (e.g., [Domain Name]   GOOGLE.JP)
+                if (prefix.StartsWith('['))
                 {
-                    var value = trimmed[prefix.Length..].Trim();
-                    if (!string.IsNullOrEmpty(value))
+                    if (trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                     {
-                        if (!fields.ContainsKey(mapping.Key))
-                            fields[mapping.Key] = [];
-                        fields[mapping.Key].Add(value);
+                        var value = trimmed[prefix.Length..].Trim();
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            if (!fields.ContainsKey(mapping.Key))
+                                fields[mapping.Key] = [];
+                            fields[mapping.Key].Add(value);
+                        }
+                        break;
                     }
-                    break;
+                    continue;
+                }
+
+                // Handle normal prefix with optional spaces before colon
+                // e.g., "Domain Name                 : google.kr" matches "Domain Name:"
+                var prefixWithoutColon = prefix.EndsWith(':') ? prefix[..^1] : prefix;
+                if (trimmed.StartsWith(prefixWithoutColon, StringComparison.OrdinalIgnoreCase))
+                {
+                    var afterPrefix = trimmed[prefixWithoutColon.Length..];
+                    if (afterPrefix.Length > 0 && (afterPrefix[0] == ':' || (afterPrefix[0] == ' ' && afterPrefix.Contains(':'))))
+                    {
+                        var colonIdx = afterPrefix.IndexOf(':');
+                        if (colonIdx >= 0)
+                        {
+                            var value = afterPrefix[(colonIdx + 1)..].Trim();
+                            if (!string.IsNullOrEmpty(value))
+                            {
+                                if (!fields.ContainsKey(mapping.Key))
+                                    fields[mapping.Key] = [];
+                                fields[mapping.Key].Add(value);
+                            }
+                            break;
+                        }
+                    }
                 }
             }
         }

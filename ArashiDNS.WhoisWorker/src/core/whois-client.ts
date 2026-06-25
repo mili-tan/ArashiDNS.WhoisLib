@@ -63,6 +63,7 @@ const SLD_WHOIS_SERVERS: Record<string, string> = {
   'gov.za': 'whois.gov.za',
   'net.za': 'net-whois.registry.net.za',
   'org.za': 'org-whois.registry.net.za',
+  'my': 'whois.mynic.my',
   'web.za': 'web-whois.registry.net.za',
 };
 
@@ -94,41 +95,41 @@ const DOMAIN_FIELD_MAPPINGS: FieldMapping[] = [
   ['domain', ['Domain Name:', 'Domain name:', 'domain name:', 'domain:', '[Domain Name]', 'Complete Domain Name:', 'Nome de domínio / Domain Name:']],
   ['registry_domain_id', ['Registry Domain ID:', 'Domain ID:', 'ROID:', 'Registry ID:']],
   // Registrar
-  ['registrar_name', ['Registrar:', 'Sponsoring Registrar:', 'Registrar Name:', 'Authorized Agency:', 'Sponsoring Registrar Organization:', 'Last Updated by Registrar:', 'Registrar ID:']],
+  ['registrar_name', ['Registrar:', 'Sponsoring Registrar:', 'Registrar Name:', 'Authorized Agency:', 'Sponsoring Registrar Organization:', 'Last Updated by Registrar:', 'Registrar ID:', '등록대행자:']],
   ['registrar_iana_id', ['Registrar IANA ID:', 'Registrar ID:', 'Sponsoring Registrar IANA ID:']],
   ['registrar_url', ['Registrar URL:', 'Registrar Website:', 'URL:', 'Sponsoring Registrar URL:', 'Sponsoring Registrar Website:', 'Referral URL:', 'Registrar URL (registration services):', 'Registration URL:']],
   ['registrar_whois', ['Registrar WHOIS Server:', 'Whois Server:', 'WHOIS Server:', 'Sponsoring Registrar WHOIS Server:']],
   ['registrar_abuse_email', ['Registrar Abuse Contact Email:', 'Sponsoring Registrar Customer Service Email:']],
   ['registrar_abuse_phone', ['Registrar Abuse Contact Phone:', 'Sponsoring Registrar Phone:', 'Sponsoring Registrar Customer Service Contact:', 'Registrar Contact Information:']],
-  // Dates - Creation
-  ['created', ['Creation Date:', 'Created:', 'Created Date:', 'Created On:', 'Domain Create Date:', 'Registration Date:', 'Registered on:', 'Registered Date:', 'Registration Time:', 'Record created:', 'Record Created:', 'created:', 'registered:', 'Domain Registration Date:', 'Domain record activated:', 'Domain Name Commencement Date:', '[Registered Date]:', '[Created on]:', 'Data de registo / Creation Date:', 'Record created on:']],
-  // Dates - Update
-  ['updated', ['Updated Date:', 'Modified:', 'Last Modified:', 'Last Updated:', 'Last Updated On:', 'Domain Last Updated Date:', 'Last Updated Date:', 'Record last updated on:', 'Record last updated:', 'Last Update:', 'last-update:', 'changed:', '[Last Update]:', '[Last Updated]:', 'modified:', 'Domain record last updated:', 'Record changed on:']],
-  // Dates - Expiration
-  ['expires', ['Registry Expiry Date:', 'Expiration Date:', 'Expires:', 'Expiry Date:', 'Expiry date:', 'Expiry:', 'expire:', 'Registrar Registration Expiration Date:', 'Domain Expiration Date:', 'Expiration Time:', 'Record expires on:', 'Record expires:', 'Expiration:', 'expires:', 'Domain expires:', '[Expires on]:', 'Data de expiração / Expiration Date:', 'Expired:']],
-  // Status
-  ['status', ['Domain Status:', 'Status:', 'Registration status:', 'Domain status:', 'status:', '[State]:', '[Status]:', 'state:', 'Estado / Status:', 'Re-registration Status:']],
-  // Name Servers
-  ['nameserver', ['Name Server:', 'Nameserver:', 'nserver:', 'Name servers:', 'Name Servers:', 'Name servers in the listed order:', 'Nameservers:', 'Nserver:', 'DNS:', 'Host Name:', '[Name Server]:', 'Domain nameservers:', 'Domain servers:', 'Domain servers in listed order:', 'Nameserver Information:', 'Primary Server Hostname:', 'Secondary Server Hostname:']],
-  // Registrant
+  // Dates - Creation (.jp: [登録年月日])
+  ['created', ['Creation Date:', 'Created:', 'Created Date:', 'Created On:', 'Domain Create Date:', 'Registration Date:', 'Registered on:', 'Registered Date:', 'Registration Time:', 'Record created:', 'Record Created:', 'created:', 'registered:', 'Domain Registration Date:', 'Domain record activated:', 'Domain Name Commencement Date:', '[Registered Date]:', '[Created on]:', 'Data de registo / Creation Date:', 'Record created on:', '[登録年月日]', 'Registered Date:', '등록일:']],
+  // Dates - Update (.jp: [最終更新])
+  ['updated', ['Updated Date:', 'Modified:', 'Last Modified:', 'Last Updated:', 'Last Updated On:', 'Domain Last Updated Date:', 'Last Updated Date:', 'Record last updated on:', 'Record last updated:', 'Last Update:', 'last-update:', 'changed:', '[Last Update]:', '[Last Updated]:', 'modified:', 'Domain record last updated:', 'Record changed on:', '[最終更新]', 'Last Updated Date:', '최근 정보 변경일:']],
+  // Dates - Expiration (.jp: [有効期限], .kr: [Expires on])
+  ['expires', ['Registry Expiry Date:', 'Expiration Date:', 'Expires:', 'Expiry Date:', 'Expiry date:', 'Expiry:', 'expire:', 'Registrar Registration Expiration Date:', 'Domain Expiration Date:', 'Expiration Time:', 'Record expires on:', 'Record expires:', 'Expiration:', 'expires:', 'Domain expires:', '[Expires on]:', '[有効期限]', 'Data de expiração / Expiration Date:', 'Expired:', 'Expiration Date:', '사용 종료일:']],
+  // Status (.jp: [状態], [ロック状態])
+  ['status', ['Domain Status:', 'Status:', 'Registration status:', 'Domain status:', 'status:', '[State]:', '[Status]:', 'state:', 'Estado / Status:', 'Re-registration Status:', '[状態]', '[ロック状態]', '등록정보 보호:']],
+  // Name Servers (.jp: [Name Server], .kr: Host Name:)
+  ['nameserver', ['Name Server:', 'Nameserver:', 'nserver:', 'Name servers:', 'Name Servers:', 'Name servers in the listed order:', 'Nameservers:', 'Nserver:', 'DNS:', 'Host Name:', '[Name Server]', 'Domain nameservers:', 'Domain servers:', 'Domain servers in listed order:', 'Nameserver Information:', 'Primary Server Hostname:', 'Secondary Server Hostname:']],
+  // Registrant (.jp: [登録者名], [Registrant], [名前], [Name])
   ['registrant_id', ['Registrant ID:', 'Registrant Contact ID:']],
-  ['registrant_name', ['Registrant Name:', 'Registrant Contact Name:', 'Registrant:', 'Name:', 'person:', 'contact:', '[Registrant]:', 'Titular / Registrant:', 'holder:', 'holder-c:', 'Organization Using Domain Name:', 'Nombre:']],
+  ['registrant_name', ['Registrant Name:', 'Registrant Contact Name:', 'Registrant:', 'Name:', 'person:', 'contact:', '[Registrant]:', '[Registrant]', 'Titular / Registrant:', 'holder:', 'holder-c:', 'Organization Using Domain Name:', 'Nombre:', '[登録者名]', '[名前]', '[Name]', '등록인:']],
   ['registrant_org', ['Registrant Organization:', 'Registrant Contact Organization:', 'Organization:', 'Org Name:', 'Organisation:', 'descr:', 'role:', 'Organization Name:', 'Company English Name:', 'org:']],
-  ['registrant_email', ['Registrant Email:', 'Registrant Contact Email:', 'Registrant Email Address:', 'Registrant E-mail:', 'AC E-Mail:', 'Email:', 'E-mail:', 'e-mail:', 'E-Mailbox:', 'Email Address:']],
-  ['registrant_street', ['Registrant Street:', 'Registrant Street1:', 'Registrant Street2:', 'Registrant Address:', 'Registrant Address1:', 'Registrant Address2:', 'Registrant Address3:', 'Registrant Contact Street:', 'Address:', 'Street:', 'address:', "Registrant's address:", 'street address:']],
+  ['registrant_email', ['Registrant Email:', 'Registrant Contact Email:', 'Registrant Email Address:', 'Registrant E-mail:', 'AC E-Mail:', 'Email:', 'E-mail:', 'e-mail:', 'E-Mailbox:', 'Email Address:', '[Email]']],
+  ['registrant_street', ['Registrant Street:', 'Registrant Street1:', 'Registrant Street2:', 'Registrant Address:', 'Registrant Address1:', 'Registrant Address2:', 'Registrant Address3:', 'Registrant Contact Street:', 'Address:', 'Street:', 'address:', "Registrant's address:", 'Registrant Address:', 'street address:', '[住所]', '[Postal Address]', 'Registrant Address:', '등록인 주소:']],
   ['registrant_city', ['Registrant City:', 'Registrant Contact City:', 'City:', 'city:']],
   ['registrant_state', ['Registrant State/Province:', 'Registrant Contact State/Province:', 'StateProv:', 'State:', 'Province:']],
-  ['registrant_postal', ['Registrant Postal Code:', 'Registrant Contact Postal Code:', 'Registrant Zip:', 'PostalCode:', 'Zip:', 'Postal Code:', 'Registrant Zip Code:', 'postal code:']],
-  ['registrant_country', ['Registrant Country:', 'Registrant Contact Country:', 'Country:', 'Country Code:', 'country:']],
-  ['registrant_phone', ['Registrant Phone:', 'Registrant Contact Phone:', 'Phone:', 'phone:', 'Telephone:', 'Registrant Phone Number:', 'TEL:', 'Phone Number:']],
+  ['registrant_postal', ['Registrant Postal Code:', 'Registrant Contact Postal Code:', 'Registrant Zip:', 'PostalCode:', 'Zip:', 'Postal Code:', 'Registrant Zip Code:', 'postal code:', '[郵便番号]', 'Registrant Zip Code:', '등록인 우편번호:']],
+  ['registrant_country', ['Registrant Country:', 'Registrant Contact Country:', 'Country:', 'Country Code:', 'country:', 'Registrant Country/Economy:']],
+  ['registrant_phone', ['Registrant Phone:', 'Registrant Contact Phone:', 'Phone:', 'phone:', 'Telephone:', 'Registrant Phone Number:', 'TEL:', 'Phone Number:', '[電話番号]']],
   ['registrant_phone_ext', ['Registrant Phone Ext:', 'Registrant Phone Ext.:']],
-  ['registrant_fax', ['Registrant Fax:', 'Registrant FAX:', 'Registrant Fax Ext:', 'Registrant FAX Ext.:', 'Registrant Facsimile Number:', 'Fax:', 'fax-no:', 'FAX:', 'Fax Number:']],
-  // Admin Contact
+  ['registrant_fax', ['Registrant Fax:', 'Registrant FAX:', 'Registrant Fax Ext:', 'Registrant FAX Ext.:', 'Registrant Facsimile Number:', 'Fax:', 'fax-no:', 'FAX:', 'Fax Number:', '[FAX番号]']],
+  // Admin Contact (.jp: [Administrative Contact])
   ['admin_id', ['Admin ID:', 'Administrative Contact ID:']],
-  ['admin_name', ['Admin Name:', 'Administrative Contact Name:', 'Admin Contact Name:', 'Admin:', 'Administrative Contact:', '[Administrative Contact]:', 'admin-c:', 'Administrative Name', 'Administrative Contact:']],
+  ['admin_name', ['Admin Name:', 'Administrative Contact Name:', 'Admin Contact Name:', 'Admin:', 'Administrative Contact:', '[Administrative Contact]', 'admin-c:', 'Administrative Name', 'Administrative Contact(AC):', '책임자:']],
   ['admin_org', ['Admin Organization:', 'Administrative Contact Organization:', 'Admin Organisation:', 'Administrative Organization:']],
-  ['admin_email', ['Admin Email:', 'Administrative Contact Email:', 'Admin E-mail:', 'Administrative Contact Email:', 'AC E-Mail:', 'Administrative Email:', 'Administrative E-mail:']],
-  ['admin_phone', ['Admin Phone:', 'Administrative Contact Phone:', 'Admin Telephone:', 'Administrative Contact Phone Number:', 'AC Phone Number:', 'Administrative Phone:']],
+  ['admin_email', ['Admin Email:', 'Administrative Contact Email:', 'Admin E-mail:', 'Administrative Contact Email:', 'AC E-Mail:', 'Administrative Email:', 'Administrative E-mail:', '책임자 전자우편:']],
+  ['admin_phone', ['Admin Phone:', 'Administrative Contact Phone:', 'Admin Telephone:', 'Administrative Contact Phone Number:', 'AC Phone Number:', 'Administrative Phone:', '책임자 전화번호:']],
   ['admin_phone_ext', ['Admin Phone Ext:', 'Administrative Phone Ext.:']],
   ['admin_fax', ['Admin Fax:', 'Admin FAX:', 'Admin Fax Ext:', 'Admin FAX Ext.:', 'Administrative Contact Facsimile Number:', 'Administrative FAX:', 'Administrative FAX Ext.:']],
   ['admin_street', ['Admin Street:', 'Admin Street1:', 'Admin Street2:', 'Admin Address:', 'Admin Address1:', 'Admin Address2:', 'Admin Address3:', 'Administrative Contact Address1:', 'Administrative Contact Address2:', 'Administrative Address:', 'Administrative Address2:', 'Administrative Address3:']],
@@ -136,9 +137,9 @@ const DOMAIN_FIELD_MAPPINGS: FieldMapping[] = [
   ['admin_state', ['Admin State/Province:', 'Administrative Contact State/Province:', 'Administrative State/Province:']],
   ['admin_postal', ['Admin Postal Code:', 'Administrative Contact Postal Code:', 'Administrative Postal Code:']],
   ['admin_country', ['Admin Country:', 'Administrative Contact Country:', 'Administrative Contact Country Code:', 'Administrative Country/Economy:']],
-  // Tech Contact
+  // Tech Contact (.jp: [Technical Contact])
   ['tech_id', ['Tech ID:', 'Technical Contact ID:', 'Tech Contact ID:', 'Technical ID:']],
-  ['tech_name', ['Tech Name:', 'Technical Contact Name:', 'Tech Contact Name:', 'Technical:', 'Technical Contact:', 'n. [Technical Contact]:', 'tech-c:', 'Technical Name:']],
+  ['tech_name', ['Tech Name:', 'Technical Contact Name:', 'Tech Contact Name:', 'Technical:', 'Technical Contact:', '[Technical Contact]', 'tech-c:', 'Technical Name:']],
   ['tech_org', ['Tech Organization:', 'Technical Contact Organization:', 'Tech Organisation:', 'Technical Contact Organization:', 'Responsável Técnico:', 'Technical Organization:']],
   ['tech_email', ['Tech Email:', 'Technical Contact Email:', 'Tech E-mail:', 'Technical Contact Email:', 'Tech Contact Email:', 'Technical E-mail:']],
   ['tech_phone', ['Tech Phone:', 'Technical Contact Phone:', 'Tech Telephone:', 'Technical Contact Phone Number:', 'Technical Phone:']],
@@ -152,23 +153,30 @@ const DOMAIN_FIELD_MAPPINGS: FieldMapping[] = [
   // Billing Contact
   ['billing_id', ['Billing ID:', 'Billing Contact ID:']],
   ['billing_name', ['Billing Name:', 'Billing Contact:']],
-  ['billing_org', ['Billing Organization:', 'Billing Contact Organization:', 'Entidade Gestora:', 'Billing Organization:']],
-  ['billing_email', ['Billing Email:', 'Billing E-mail:', 'Billing Contact Email:', 'Billing E-mail:']],
-  ['billing_phone', ['Billing Phone:', 'Billing Contact Phone Number:', 'Billing Phone:']],
-  ['billing_phone_ext', ['Billing Phone Ext:', 'Billing Phone Ext.:']],
-  ['billing_fax', ['Billing Fax:', 'Billing FAX:', 'Billing Fax Ext:', 'Billing FAX Ext.:', 'Billing Contact Facsimile Number:', 'Billing FAX:', 'Billing FAX Ext.:']],
+  ['billing_org', ['Billing Organization:', 'Billing Contact Organization:', 'Entidade Gestora:']],
+  ['billing_email', ['Billing Email:', 'Billing E-mail:', 'Billing Contact Email:']],
+  ['billing_phone', ['Billing Phone:', 'Billing Contact Phone Number:']],
+  ['billing_phone_ext', ['Billing Phone Ext:']],
+  ['billing_fax', ['Billing Fax:', 'Billing FAX:', 'Billing Fax Ext:', 'Billing FAX Ext.:', 'Billing Contact Facsimile Number:']],
   ['billing_street', ['Billing Street:', 'Billing Street1:', 'Billing Street2:', 'Billing Address:', 'Billing Address1:', 'Billing Address2:', 'Billing Address3:', 'Billing Contact Address1:']],
   ['billing_city', ['Billing City:', 'Billing Contact City:']],
   ['billing_state', ['Billing State/Province:', 'Billing Contact State/Province:']],
   ['billing_postal', ['Billing Postal Code:', 'Billing Contact Postal Code:']],
   ['billing_country', ['Billing Country:', 'Billing Contact Country:', 'Billing Contact Country Code:']],
-  // DNSSEC / Trademark / Other
-  ['dnssec', ['DNSSEC:', 'DNSSEC', 'dnssec:']],
+  // DNSSEC / Trademark / Other (.jp: [Signing Key])
+  ['dnssec', ['DNSSEC:', 'DNSSEC', 'dnssec:', '[Signing Key]']],
   ['trademark_name', ['Trademark Name:']],
   ['trademark_date', ['Trademark Date:']],
   ['trademark_country', ['Trademark Country:']],
   ['trademark_number', ['Trademark Number:']],
   ['remarks', ['Remarks:', 'remarks:']],
+  // .kr specific
+  ['registrant_address_kr', ['[Registrant Address]']],
+  ['registrant_street_kr', ['[Registrant Street]']],
+  ['admin_address_kr', ['[Admin Address]']],
+  ['admin_street_kr', ['[Admin Street]']],
+  ['tech_address_kr', ['[Tech Address]']],
+  ['tech_street_kr', ['[Tech Street]']],
 ];
 
 const IP_FIELD_MAPPINGS: FieldMapping[] = [
@@ -206,17 +214,44 @@ function extractFields(rawResponse: string, sortedMappings: [string, string][]):
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('%') || trimmed.startsWith('#')) continue;
 
+    // Skip comment lines like [ JPRS database... ]
+    if (trimmed.startsWith('[') && trimmed.endsWith(']') && !trimmed.includes('] ')) continue;
+
     const wordCount = trimmed.split(/\s+/).length;
     if (wordCount > 10) continue;
 
     for (const [key, prefix] of sortedMappings) {
-      if (trimmed.toLowerCase().startsWith(prefix.toLowerCase())) {
-        const value = trimmed.slice(prefix.length).trim();
-        if (value) {
-          if (!fields.has(key)) fields.set(key, []);
-          fields.get(key)!.push(value);
+      // Handle [FieldName] format (e.g., [Domain Name]   GOOGLE.JP)
+      if (prefix.startsWith('[')) {
+        const bracketPrefix = prefix;
+        if (trimmed.toLowerCase().startsWith(bracketPrefix.toLowerCase())) {
+          const value = trimmed.slice(bracketPrefix.length).trim();
+          if (value) {
+            if (!fields.has(key)) fields.set(key, []);
+            fields.get(key)!.push(value);
+          }
+          break;
         }
-        break;
+      }
+
+      // Handle normal prefix format with optional spaces before colon
+      // e.g., "Domain Name                 : google.kr" matches "Domain Name:"
+      const prefixWithoutColon = prefix.endsWith(':') ? prefix.slice(0, -1) : prefix;
+      const lowerTrimmed = trimmed.toLowerCase();
+      const lowerPrefix = prefixWithoutColon.toLowerCase();
+      
+      if (lowerTrimmed.startsWith(lowerPrefix)) {
+        // Check if next char is ':' or spaces followed by ':'
+        const afterPrefix = trimmed.slice(prefixWithoutColon.length);
+        const colonMatch = afterPrefix.match(/^\s*:\s*/);
+        if (colonMatch) {
+          const value = afterPrefix.slice(colonMatch[0].length).trim();
+          if (value) {
+            if (!fields.has(key)) fields.set(key, []);
+            fields.get(key)!.push(value);
+          }
+          break;
+        }
       }
     }
   }
@@ -296,6 +331,13 @@ function parseWhoisDate(dateStr: string): string | null {
   const korMatch = dateStr.match(/^(\d{4})\.\s*(\d{2})\.\s*(\d{2})/);
   if (korMatch) {
     const d = new Date(`${korMatch[1]}-${korMatch[2]}-${korMatch[3]}`);
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  }
+
+  // Japanese: yyyy/MM/dd
+  const jpMatch = dateStr.match(/^(\d{4})\/(\d{2})\/(\d{2})/);
+  if (jpMatch) {
+    const d = new Date(`${jpMatch[1]}-${jpMatch[2]}-${jpMatch[3]}`);
     if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
   }
 
