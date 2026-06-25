@@ -30,7 +30,8 @@ export class RdapClient {
           trace,
         };
       }
-      return await this.queryWithReferral(query, queryType, endpoint, trace, 0, new Set<string>());
+      const visited = new Set<string>([endpoint.toLowerCase()]);
+      return await this.queryWithReferral(query, queryType, endpoint, trace, 0, visited);
     } catch (ex) {
       return {
         response: {
@@ -123,10 +124,10 @@ export class RdapClient {
 
     if (result.isSuccessful && depth < maxDepth && this.needsReferral(result)) {
       const relatedLink = this.parser.extractRelatedLink(json);
-      if (relatedLink && !visited.has(relatedLink)) {
-        visited.add(relatedLink);
-        const { response: referralResult, trace: referralTrace } = await this.queryWithReferral(query, queryType, relatedLink, trace, depth + 1, visited);
-        trace.push(...referralTrace);
+      const normalizedLink = relatedLink?.toLowerCase();
+      if (relatedLink && normalizedLink && !visited.has(normalizedLink)) {
+        visited.add(normalizedLink);
+        const { response: referralResult } = await this.queryWithReferral(query, queryType, relatedLink, trace, depth + 1, visited);
 
         if (referralResult.isSuccessful && this.hasUsefulData(referralResult)) {
           this.mergeResults(result, referralResult);
