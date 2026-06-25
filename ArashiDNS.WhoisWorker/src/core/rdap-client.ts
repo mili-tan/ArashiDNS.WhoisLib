@@ -30,7 +30,7 @@ export class RdapClient {
           trace,
         };
       }
-      return await this.queryWithReferral(query, queryType, endpoint, trace, 0);
+      return await this.queryWithReferral(query, queryType, endpoint, trace, 0, new Set<string>());
     } catch (ex) {
       return {
         response: {
@@ -47,7 +47,7 @@ export class RdapClient {
 
   private async queryWithReferral(
     query: string, queryType: WhoisQueryType, endpoint: string,
-    trace: TraceEntry[], depth: number,
+    trace: TraceEntry[], depth: number, visited: Set<string>,
   ): Promise<{ response: WhoisResponse; trace: TraceEntry[] }> {
     const maxDepth = 3;
     if (depth >= maxDepth) {
@@ -123,8 +123,9 @@ export class RdapClient {
 
     if (result.isSuccessful && depth < maxDepth && this.needsReferral(result)) {
       const relatedLink = this.parser.extractRelatedLink(json);
-      if (relatedLink) {
-        const { response: referralResult, trace: referralTrace } = await this.queryWithReferral(query, queryType, relatedLink, trace, depth + 1);
+      if (relatedLink && !visited.has(relatedLink)) {
+        visited.add(relatedLink);
+        const { response: referralResult, trace: referralTrace } = await this.queryWithReferral(query, queryType, relatedLink, trace, depth + 1, visited);
         trace.push(...referralTrace);
 
         if (referralResult.isSuccessful && this.hasUsefulData(referralResult)) {
