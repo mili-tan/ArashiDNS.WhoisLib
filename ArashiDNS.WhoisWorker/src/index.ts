@@ -15,8 +15,8 @@ function corsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
-function jsonResponse(data: unknown, status = 200, origin: string | null = null): Response {
-  return new Response(JSON.stringify(data, null, 2), {
+function jsonResponse(data: unknown, status = 200, origin: string | null = null, compact = false): Response {
+  return new Response(JSON.stringify(compact ? stripEmpty(data) : data, null, 2), {
     status,
     headers: {
       'Content-Type': 'application/json',
@@ -94,8 +94,6 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
   const mode = url.searchParams.get('mode') || 'auto'; // auto | rdap | whois
 
   const queryType = detectQueryType(query);
-  const bootstrap = new BootstrapProvider(env.A_WHOIS_CACHE_KV);
-  const registrarProvider = new RegistrarProvider(env.A_WHOIS_CACHE_KV);
 
   let response: WhoisResponse;
   let traceEntries: TraceEntry[] = [];
@@ -108,6 +106,7 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
     traceEntries = result.trace;
   } else if (mode === 'auto') {
     // Auto mode: try RDAP first, fallback to WHOIS TCP
+    const bootstrap = new BootstrapProvider(env.A_WHOIS_CACHE_KV);
     const rdapClient = new RdapClient(bootstrap);
     const rdapResult = await rdapClient.query(query, queryType);
     response = rdapResult.response;
@@ -120,25 +119,28 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
       traceEntries.push(...whoisResult.trace);
     }
   } else {
-    // RDAP mode (default, also for IP/ASN)
+    // RDAP mode
+    const bootstrap = new BootstrapProvider(env.A_WHOIS_CACHE_KV);
     const rdapClient = new RdapClient(bootstrap);
     const rdapResult = await rdapClient.query(query, queryType);
     response = rdapResult.response;
     traceEntries = rdapResult.trace;
   }
 
+  const rawResponse = response.rawResponse;
+
+  // If query failed, try LLM fallback
   if (!response.isSuccessful) {
-    // Try LLM if RDAP failed and LLM is enabled
-    if (useLlm && env.DEEPSEEK_API_KEY) {
+    if (useLlm && env.DEEPSEEK_API_KEY && rawResponse) {
       const llmFormatter = new LlmFormatter(env);
-      if (llmFormatter.isEnabled && response.rawResponse) {
-        const llmResult = await llmFormatter.format(response.rawResponse);
+      if (llmFormatter.isEnabled) {
+        const llmResult = await llmFormatter.format(rawResponse);
         if (llmResult) {
           return jsonResponse({
             ...llmResult,
-            ...(raw ? { rawResponse: response.rawResponse } : {}),
+            ...(raw ? { rawResponse } : {}),
             ...(trace ? { trace: traceEntries } : {}),
-          }, 200, origin);
+          }, 200, origin, !showEmpty);
         }
       }
     }
@@ -147,30 +149,31 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
       error: response.errorMessage,
       query,
       queryType,
-      ...(raw ? { rawResponse: response.rawResponse } : {}),
+      ...(raw ? { rawResponse } : {}),
       ...(trace ? { trace: traceEntries } : {}),
     }, 404, origin);
   }
 
-  // Enrich with privacy detection
+  // Enrich response
   response.privacy = detectPrivacy(response);
-
-  // Enrich with registry identification
   response.registry = identifyRegistry(response);
 
-  // Enrich with registrar identification
-  response.registrar = await identifyRegistrar(response, registrarProvider);
+  // Only fetch registrar data if we might need it (not using LLM, or LLM not enabled)
+  const llmAvailable = useLlm && env.DEEPSEEK_API_KEY;
+  if (!llmAvailable || !rawResponse) {
+    const registrarProvider = new RegistrarProvider(env.A_WHOIS_CACHE_KV);
+    response.registrar = await identifyRegistrar(response, registrarProvider);
+  }
 
-  // Merge contacts
   const contacts = mergeContacts(response.contacts);
 
-  // Try LLM if registrar/dates are missing and LLM is enabled
-  if (useLlm && env.DEEPSEEK_API_KEY && response.rawResponse) {
+  // Try LLM if registrar/dates are missing
+  if (llmAvailable && rawResponse) {
     const needsLlm = !response.registrar?.name || !response.dates?.expires;
     if (needsLlm) {
       const llmFormatter = new LlmFormatter(env);
       if (llmFormatter.isEnabled) {
-        const llmResult = await llmFormatter.format(response.rawResponse);
+        const llmResult = await llmFormatter.format(rawResponse);
         if (llmResult) {
           traceEntries.push({
             protocol: 'LLM',
@@ -178,14 +181,19 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
             formatter: 'LLM',
             success: true,
           });
-
           return jsonResponse({
             ...llmResult,
-            ...(raw ? { rawResponse: response.rawResponse } : {}),
+            ...(raw ? { rawResponse } : {}),
             ...(trace ? { trace: traceEntries } : {}),
-          }, 200, origin);
+          }, 200, origin, !showEmpty);
         }
       }
+    }
+
+    // LLM didn't run or failed, fill registrar if missing
+    if (!response.registrar?.name) {
+      const registrarProvider = new RegistrarProvider(env.A_WHOIS_CACHE_KV);
+      response.registrar = await identifyRegistrar(response, registrarProvider);
     }
   }
 
@@ -199,11 +207,11 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
     nameServers: response.nameServers,
     status: response.statuses,
     dnssec: response.dnssec,
-    ...(raw ? { rawResponse: response.rawResponse || undefined } : {}),
+    ...(raw ? { rawResponse: rawResponse || undefined } : {}),
     ...(trace ? { trace: traceEntries } : {}),
   };
 
-  return jsonResponse(showEmpty ? result : stripEmpty(result), 200, origin);
+  return jsonResponse(result, 200, origin, !showEmpty);
 }
 
 interface RawContactCollection {
