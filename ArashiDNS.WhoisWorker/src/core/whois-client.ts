@@ -72,12 +72,14 @@ const DATE_FORMATS = [
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z?/,
   /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/,
   /^(\d{4})-(\d{2})-(\d{2})$/,
+  /^(\d{2})-([A-Za-z]{3})-(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/,
   /^(\d{2})-([A-Za-z]{3})-(\d{4})$/,
   /^(\d{2})\.(\d{2})\.(\d{4})$/,
   /^(\d{2})\/(\d{2})\/(\d{4})$/,
   /^(\d{4})\.(\d{2})\.(\d{2})/,
   /^(\d{4})\/(\d{2})\/(\d{2})/,
   /^(\d{4})(\d{2})(\d{2})$/,
+  /^([A-Za-z]+)\s+(\d{1,2})\s+(\d{4})/,
 ];
 
 const MONTH_MAP: Record<string, string> = {
@@ -90,33 +92,71 @@ type FieldMapping = [string, string[]];
 const DOMAIN_FIELD_MAPPINGS: FieldMapping[] = [
   ['domain', ['Domain Name:', 'Domain name:', 'domain name:', 'domain:', '[Domain Name]']],
   ['registrar_name', ['Registrar:', 'Sponsoring Registrar:', 'Registrar Name:', 'Authorized Agency:']],
-  ['registrar_iana_id', ['Registrar IANA ID:', 'Registrar ID:']],
-  ['registrar_url', ['Registrar URL:', 'Registrar Website:', 'URL:']],
-  ['registrar_whois', ['Registrar WHOIS Server:', 'Whois Server:']],
-  ['created', ['Creation Date:', 'Created:', 'Created Date:', 'Created On:', 'Registration Date:', 'Registered on:', 'Registered Date:', 'Registration Time:', 'Record created:', 'Record Created:']],
-  ['updated', ['Updated Date:', 'Modified:', 'Last Modified:', 'Last Updated:', 'Last Updated On:', 'Last Updated Date:', 'Record last updated on:', 'Record last updated:', 'Last Update:']],
-  ['expires', ['Registry Expiry Date:', 'Expiration Date:', 'Expires:', 'Expiry Date:', 'Registrar Registration Expiration Date:', 'Expiration Time:', 'Record expires on:', 'Record expires:', 'Expiration:']],
-  ['status', ['Domain Status:', 'Status:', 'Registration status:', 'Domain status:']],
+  ['registrar_iana_id', ['Registrar IANA ID:', 'Registrar ID:', 'Sponsoring Registrar IANA ID:']],
+  ['registrar_url', ['Registrar URL:', 'Registrar Website:', 'URL:', 'Sponsoring Registrar URL:', 'Referral URL:']],
+  ['registrar_whois', ['Registrar WHOIS Server:', 'Whois Server:', 'WHOIS Server:', 'Sponsoring Registrar WHOIS Server:']],
+  ['registrar_abuse_email', ['Registrar Abuse Contact Email:', 'Sponsoring Registrar Customer Service Email:']],
+  ['registrar_abuse_phone', ['Registrar Abuse Contact Phone:', 'Sponsoring Registrar Phone:', 'Sponsoring Registrar Customer Service Contact:']],
+  ['created', ['Creation Date:', 'Created:', 'Created Date:', 'Created On:', 'Domain Create Date:', 'Registration Date:', 'Registered on:', 'Registered Date:', 'Registration Time:', 'Record created:', 'Record Created:', 'created:']],
+  ['updated', ['Updated Date:', 'Modified:', 'Last Modified:', 'Last Updated:', 'Last Updated On:', 'Domain Last Updated Date:', 'Last Updated Date:', 'Record last updated on:', 'Record last updated:', 'Last Update:', 'last-update:', 'changed:']],
+  ['expires', ['Registry Expiry Date:', 'Expiration Date:', 'Expires:', 'Expiry Date:', 'Registrar Registration Expiration Date:', 'Domain Expiration Date:', 'Expiration Time:', 'Record expires on:', 'Record expires:', 'Expiration:', 'expires:']],
+  ['status', ['Domain Status:', 'Status:', 'Registration status:', 'Domain status:', 'status:']],
   ['nameserver', ['Name Server:', 'Nameserver:', 'nserver:', 'Name servers:', 'Name Servers:', 'Name servers in the listed order:', 'Nameservers:']],
-  ['registrant_name', ['Registrant Name:', 'Registrant Contact Name:', 'Registrant:', 'Name:']],
-  ['registrant_org', ['Registrant Organization:', 'Registrant Contact Organization:', 'Organization:', 'Org Name:', 'Organisation:']],
-  ['registrant_email', ['Registrant Email:', 'Registrant Contact Email:', 'Registrant Email Address:', 'AC E-Mail:', 'Email:', 'E-mail:']],
-  ['registrant_street', ['Registrant Street:', 'Registrant Street1:', 'Registrant Contact Street:', 'Address:', 'Street:']],
+  ['registrant_id', ['Registrant ID:']],
+  ['registrant_name', ['Registrant Name:', 'Registrant Contact Name:', 'Registrant:', 'Name:', 'person:', 'contact:']],
+  ['registrant_org', ['Registrant Organization:', 'Registrant Contact Organization:', 'Organization:', 'Org Name:', 'Organisation:', 'descr:', 'role:']],
+  ['registrant_email', ['Registrant Email:', 'Registrant Contact Email:', 'Registrant Email Address:', 'Registrant E-mail:', 'AC E-Mail:', 'Email:', 'E-mail:', 'e-mail:']],
+  ['registrant_street', ['Registrant Street:', 'Registrant Street1:', 'Registrant Street2:', 'Registrant Address:', 'Registrant Address1:', 'Registrant Address2:', 'Registrant Address3:', 'Registrant Contact Street:', 'Address:', 'Street:', 'address:']],
   ['registrant_city', ['Registrant City:', 'Registrant Contact City:', 'City:']],
   ['registrant_state', ['Registrant State/Province:', 'Registrant Contact State/Province:', 'StateProv:', 'State:', 'Province:']],
   ['registrant_postal', ['Registrant Postal Code:', 'Registrant Contact Postal Code:', 'Registrant Zip:', 'PostalCode:', 'Zip:', 'Postal Code:']],
-  ['registrant_country', ['Registrant Country:', 'Registrant Contact Country:', 'Country:', 'Country Code:']],
+  ['registrant_country', ['Registrant Country:', 'Registrant Contact Country:', 'Country:', 'Country Code:', 'country:']],
   ['registrant_phone', ['Registrant Phone:', 'Registrant Contact Phone:', 'Phone:', 'phone:', 'Telephone:']],
+  ['registrant_phone_ext', ['Registrant Phone Ext:']],
+  ['registrant_fax', ['Registrant Fax:', 'Registrant FAX:', 'Registrant Fax Ext:', 'Registrant FAX Ext.:', 'Fax:', 'fax-no:']],
+  ['admin_id', ['Admin ID:']],
   ['admin_name', ['Admin Name:', 'Administrative Contact Name:', 'Admin Contact Name:', 'Admin:']],
   ['admin_org', ['Admin Organization:', 'Administrative Contact Organization:', 'Admin Organisation:']],
-  ['admin_email', ['Admin Email:', 'Administrative Contact Email:', 'Admin E-mail:']],
+  ['admin_email', ['Admin Email:', 'Administrative Contact Email:', 'Admin E-mail:', 'Admin E-mail:']],
   ['admin_phone', ['Admin Phone:', 'Administrative Contact Phone:', 'Admin Telephone:']],
+  ['admin_phone_ext', ['Admin Phone Ext:']],
+  ['admin_fax', ['Admin Fax:', 'Admin FAX:', 'Admin Fax Ext:', 'Admin FAX Ext.:']],
+  ['admin_street', ['Admin Street:', 'Admin Street1:', 'Admin Street2:', 'Admin Address:', 'Admin Address1:', 'Admin Address2:', 'Admin Address3:']],
+  ['admin_city', ['Admin City:']],
+  ['admin_state', ['Admin State/Province:']],
+  ['admin_postal', ['Admin Postal Code:']],
+  ['admin_country', ['Admin Country:']],
+  ['tech_id', ['Tech ID:']],
   ['tech_name', ['Tech Name:', 'Technical Contact Name:', 'Tech Contact Name:', 'Technical:']],
   ['tech_org', ['Tech Organization:', 'Technical Contact Organization:', 'Tech Organisation:']],
-  ['tech_email', ['Tech Email:', 'Technical Contact Email:', 'Tech E-mail:']],
+  ['tech_email', ['Tech Email:', 'Technical Contact Email:', 'Tech E-mail:', 'Tech E-mail:']],
   ['tech_phone', ['Tech Phone:', 'Technical Contact Phone:', 'Tech Telephone:']],
+  ['tech_phone_ext', ['Tech Phone Ext:']],
+  ['tech_fax', ['Tech Fax:', 'Tech FAX:', 'Tech Fax Ext:', 'Tech FAX Ext.:']],
+  ['tech_street', ['Tech Street:', 'Tech Street1:', 'Tech Street2:', 'Tech Address:', 'Tech Address1:', 'Tech Address2:', 'Tech Address3:']],
+  ['tech_city', ['Tech City:']],
+  ['tech_state', ['Tech State/Province:']],
+  ['tech_postal', ['Tech Postal Code:']],
+  ['tech_country', ['Tech Country:']],
+  ['billing_id', ['Billing ID:']],
+  ['billing_name', ['Billing Name:']],
+  ['billing_org', ['Billing Organization:']],
+  ['billing_email', ['Billing Email:', 'Billing E-mail:']],
+  ['billing_phone', ['Billing Phone:']],
+  ['billing_phone_ext', ['Billing Phone Ext:']],
+  ['billing_fax', ['Billing Fax:', 'Billing FAX:', 'Billing Fax Ext:', 'Billing FAX Ext.:']],
+  ['billing_street', ['Billing Street:', 'Billing Street1:', 'Billing Street2:', 'Billing Address:', 'Billing Address1:', 'Billing Address2:', 'Billing Address3:']],
+  ['billing_city', ['Billing City:']],
+  ['billing_state', ['Billing State/Province:']],
+  ['billing_postal', ['Billing Postal Code:']],
+  ['billing_country', ['Billing Country:']],
   ['registry_domain_id', ['Registry Domain ID:', 'Domain ID:', 'ROID:', 'Registry ID:']],
   ['dnssec', ['DNSSEC:', 'DNSSEC']],
+  ['trademark_name', ['Trademark Name:']],
+  ['trademark_date', ['Trademark Date:']],
+  ['trademark_country', ['Trademark Country:']],
+  ['trademark_number', ['Trademark Number:']],
+  ['remarks', ['Remarks:', 'remarks:']],
 ];
 
 const IP_FIELD_MAPPINGS: FieldMapping[] = [
@@ -202,7 +242,7 @@ function parseWhoisDate(dateStr: string): string | null {
     if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
   }
 
-  // dd-MMM-yyyy
+  // dd-MMM-yyyy (with optional time)
   const dmyMatch = dateStr.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})/);
   if (dmyMatch) {
     const month = MONTH_MAP[dmyMatch[2].toLowerCase()];
@@ -216,6 +256,13 @@ function parseWhoisDate(dateStr: string): string | null {
   const dotMatch = dateStr.match(/^(\d{2})\.(\d{2})\.(\d{4})/);
   if (dotMatch) {
     const d = new Date(`${dotMatch[3]}-${dotMatch[2]}-${dotMatch[1]}`);
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  }
+
+  // dd/MM/yyyy
+  const slashMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (slashMatch) {
+    const d = new Date(`${slashMatch[3]}-${slashMatch[2]}-${slashMatch[1]}`);
     if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
   }
 
@@ -237,6 +284,13 @@ function parseWhoisDate(dateStr: string): string | null {
   const korMatch = dateStr.match(/^(\d{4})\.\s*(\d{2})\.\s*(\d{2})/);
   if (korMatch) {
     const d = new Date(`${korMatch[1]}-${korMatch[2]}-${korMatch[3]}`);
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  }
+
+  // Month name format: "June 30 2010" or "June  30 2010"
+  const monthNameMatch = dateStr.match(/^([A-Za-z]+)\s+(\d{1,2})\s+(\d{4})/);
+  if (monthNameMatch) {
+    const d = new Date(`${monthNameMatch[1]} ${monthNameMatch[2]}, ${monthNameMatch[3]}`);
     if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
   }
 
@@ -539,6 +593,7 @@ export class WhoisTcpClient {
     base.contacts.registrant = parseContact(fields, 'registrant');
     base.contacts.admin = parseContact(fields, 'admin');
     base.contacts.tech = parseContact(fields, 'tech');
+    base.contacts.billing = parseContact(fields, 'billing');
 
     // Section-based fallback
     if (!base.domain || (!base.registrar?.name && !base.dates?.expires)) {
@@ -550,12 +605,14 @@ export class WhoisTcpClient {
       if (!base.contacts.registrant && section.contacts?.registrant) base.contacts.registrant = section.contacts.registrant;
       if (!base.contacts.admin && section.contacts?.admin) base.contacts.admin = section.contacts.admin;
       if (!base.contacts.tech && section.contacts?.tech) base.contacts.tech = section.contacts.tech;
+      if (!base.contacts.billing && section.contacts?.billing) base.contacts.billing = section.contacts.billing;
     }
 
     // Set roles
     if (base.contacts.registrant) base.contacts.registrant.roles = ['registrant'];
     if (base.contacts.admin) base.contacts.admin.roles = ['admin'];
     if (base.contacts.tech) base.contacts.tech.roles = ['tech'];
+    if (base.contacts.billing) base.contacts.billing.roles = ['billing'];
 
     return base;
   }
