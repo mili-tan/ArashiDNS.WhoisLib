@@ -51,7 +51,7 @@ public class RdapClient : IWhoisClient
         {
             // Use custom RDAP endpoint
             var endpoint = server.TrimEnd('/') + "/domain/" + Uri.EscapeDataString(query.ToUpperInvariant());
-            return await QueryWithReferralAsync(query, DetectQueryType(query), endpoint);
+            return await QueryWithReferralAsync(query, DetectQueryType(query), endpoint, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         }
         return await QueryAsync(query);
     }
@@ -71,7 +71,7 @@ public class RdapClient : IWhoisClient
                 };
             }
 
-            return await QueryWithReferralAsync(query, queryType, endpoint);
+            return await QueryWithReferralAsync(query, queryType, endpoint, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         }
         catch (Exception ex)
         {
@@ -84,7 +84,7 @@ public class RdapClient : IWhoisClient
         }
     }
 
-    private async Task<WhoisResponse> QueryWithReferralAsync(string query, WhoisQueryType queryType, string endpoint, int depth = 0)
+    private async Task<WhoisResponse> QueryWithReferralAsync(string query, WhoisQueryType queryType, string endpoint, HashSet<string> visited, int depth = 0)
     {
         const int maxDepth = 3;
         if (depth >= maxDepth)
@@ -116,9 +116,10 @@ public class RdapClient : IWhoisClient
         if (result.IsSuccessful && depth < maxDepth && NeedsReferral(result))
         {
             var relatedLink = ExtractRelatedLink(json);
-            if (!string.IsNullOrEmpty(relatedLink))
+            if (!string.IsNullOrEmpty(relatedLink) && !visited.Contains(relatedLink))
             {
-                var referralResult = await QueryWithReferralAsync(query, queryType, relatedLink, depth + 1);
+                visited.Add(relatedLink);
+                var referralResult = await QueryWithReferralAsync(query, queryType, relatedLink, visited, depth + 1);
 
                 if (referralResult.IsSuccessful && HasUsefulData(referralResult))
                 {
