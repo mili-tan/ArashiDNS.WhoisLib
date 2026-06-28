@@ -4,6 +4,14 @@ export interface RegistryInfo {
   name: string;
   website: string;
   whoisServer: string;
+  rdapEndpoint?: string;
+  type?: string;
+  manager?: string;
+  sponsoringOrganisation?: string;
+  registrationDate?: string;
+  lastUpdated?: string;
+  adminContact?: { name?: string; email?: string; voice?: string; fax?: string };
+  techContact?: { name?: string; email?: string; voice?: string; fax?: string };
 }
 
 export interface RegistrarInfo {
@@ -11,6 +19,10 @@ export interface RegistrarInfo {
   name: string;
   website: string;
   whoisServer: string;
+  rdapUrl?: string;
+  status?: string;
+  country?: string;
+  contact?: { name?: string; phone?: string; email?: string };
 }
 
 export interface ContactInfo {

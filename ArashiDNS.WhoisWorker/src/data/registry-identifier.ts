@@ -106,6 +106,24 @@ export async function identifyRegistryFromTldData(
     name: entry.manager || entry.sponsoring_organisation || '',
     website: entry.registration_url || '',
     whoisServer: entry.whois_server || '',
+    rdapEndpoint: entry.rdap_server || '',
+    type: entry.type || '',
+    manager: entry.manager || '',
+    sponsoringOrganisation: entry.sponsoring_organisation || '',
+    registrationDate: entry.registration_date || '',
+    lastUpdated: entry.record_last_updated || '',
+    adminContact: entry.admin_contact ? {
+      name: entry.admin_contact.name,
+      email: entry.admin_contact.email,
+      voice: entry.admin_contact.voice,
+      fax: entry.admin_contact.fax,
+    } : undefined,
+    techContact: entry.tech_contact ? {
+      name: entry.tech_contact.name,
+      email: entry.tech_contact.email,
+      voice: entry.tech_contact.voice,
+      fax: entry.tech_contact.fax,
+    } : undefined,
   };
 }
 
@@ -148,6 +166,16 @@ export async function identifyRegistrarFromData(
       registrar.name = entry.registrar_name || registrar.name;
       registrar.website = entry.website || registrar.website;
       registrar.whoisServer = entry.whois_server || registrar.whoisServer;
+      registrar.rdapUrl = entry.rdap_url || '';
+      registrar.status = entry.status || '';
+      registrar.country = entry.country || '';
+      if (entry.contact) {
+        registrar.contact = {
+          name: entry.contact.name,
+          phone: entry.contact.phone,
+          email: entry.contact.email,
+        };
+      }
       return registrar;
     }
   }
@@ -159,6 +187,16 @@ export async function identifyRegistrarFromData(
       registrar.name = entry.registrar_name || registrar.name;
       registrar.website = entry.website || registrar.website;
       registrar.whoisServer = entry.whois_server || registrar.whoisServer;
+      registrar.rdapUrl = entry.rdap_url || '';
+      registrar.status = entry.status || '';
+      registrar.country = entry.country || '';
+      if (entry.contact) {
+        registrar.contact = {
+          name: entry.contact.name,
+          phone: entry.contact.phone,
+          email: entry.contact.email,
+        };
+      }
       return registrar;
     }
   }
