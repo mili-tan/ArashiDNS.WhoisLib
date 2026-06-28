@@ -51,7 +51,7 @@ public class RdapClient : IWhoisClient
         {
             // Use custom RDAP endpoint
             var endpoint = server.TrimEnd('/') + "/domain/" + Uri.EscapeDataString(query.ToUpperInvariant());
-            return await QueryWithReferralAsync(query, DetectQueryType(query), endpoint, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            return await QueryWithReferralAsync(query, DetectQueryType(query), endpoint, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { endpoint });
         }
         return await QueryAsync(query);
     }
@@ -71,7 +71,7 @@ public class RdapClient : IWhoisClient
                 };
             }
 
-            return await QueryWithReferralAsync(query, queryType, endpoint, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            return await QueryWithReferralAsync(query, queryType, endpoint, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { endpoint });
         }
         catch (Exception ex)
         {
