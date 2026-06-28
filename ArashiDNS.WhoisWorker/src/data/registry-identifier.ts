@@ -1,5 +1,7 @@
-import type { WhoisResponse, RegistryInfo, RegistrarInfo, RegistrarEntry, Env } from '../types';
+import type { WhoisResponse, RegistryInfo, RegistrarInfo, RegistrarEntry } from '../types';
 import { TLD_REGISTRY } from './tld-registry';
+import { TldDataProvider } from './tld-data-provider';
+import { RegistrarDataProvider } from './registrar-data-provider';
 
 const REGISTRARS_URL = 'https://www.iana.org/assignments/registrar-ids/registrar-ids.xhtml';
 const CACHE_TTL = 60 * 60 * 24 * 7; // 7 days
@@ -50,7 +52,6 @@ export class RegistrarProvider {
     const html = await resp.text();
     const entries: RegistrarEntry[] = [];
 
-    // Parse HTML table rows
     const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
     let rowMatch;
     while ((rowMatch = rowRegex.exec(html)) !== null) {
@@ -91,6 +92,23 @@ export function identifyRegistry(response: WhoisResponse): RegistryInfo | null {
   } : { name: '', website: '', whoisServer: response.whoisServer };
 }
 
+export async function identifyRegistryFromTldData(
+  response: WhoisResponse,
+  tldProvider: TldDataProvider,
+): Promise<RegistryInfo | null> {
+  const tld = extractTld(response.domain);
+  if (!tld) return null;
+
+  const entry = await tldProvider.getTldInfo(tld);
+  if (!entry) return null;
+
+  return {
+    name: entry.manager || entry.sponsoring_organisation || '',
+    website: entry.registration_url || '',
+    whoisServer: entry.whois_server || '',
+  };
+}
+
 export async function identifyRegistrar(response: WhoisResponse, provider: RegistrarProvider): Promise<RegistrarInfo | null> {
   if (!response.registrar?.name) return null;
 
@@ -109,6 +127,38 @@ export async function identifyRegistrar(response: WhoisResponse, provider: Regis
     if (entry) {
       registrar.ianaId = entry.id;
       registrar.website = entry.rdapBaseUrl || registrar.website;
+      return registrar;
+    }
+  }
+
+  return registrar;
+}
+
+export async function identifyRegistrarFromData(
+  response: WhoisResponse,
+  registrarDataProvider: RegistrarDataProvider,
+): Promise<RegistrarInfo | null> {
+  if (!response.registrar?.name) return null;
+
+  const registrar = response.registrar;
+
+  if (registrar.ianaId) {
+    const entry = await registrarDataProvider.findById(registrar.ianaId);
+    if (entry) {
+      registrar.name = entry.registrar_name || registrar.name;
+      registrar.website = entry.website || registrar.website;
+      registrar.whoisServer = entry.whois_server || registrar.whoisServer;
+      return registrar;
+    }
+  }
+
+  if (registrar.name) {
+    const entry = await registrarDataProvider.findByName(registrar.name);
+    if (entry) {
+      registrar.ianaId = entry.iana_id || registrar.ianaId;
+      registrar.name = entry.registrar_name || registrar.name;
+      registrar.website = entry.website || registrar.website;
+      registrar.whoisServer = entry.whois_server || registrar.whoisServer;
       return registrar;
     }
   }

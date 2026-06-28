@@ -2,7 +2,9 @@ import type { Env, FormattedResult, TraceEntry, ContactInfo, WhoisResponse } fro
 import { RdapClient, detectQueryType } from './core/rdap-client';
 import { WhoisTcpClient } from './core/whois-client';
 import { BootstrapProvider } from './data/bootstrap-provider';
-import { RegistrarProvider, identifyRegistry, identifyRegistrar } from './data/registry-identifier';
+import { RegistrarProvider, identifyRegistry, identifyRegistryFromTldData, identifyRegistrar, identifyRegistrarFromData } from './data/registry-identifier';
+import { TldDataProvider } from './data/tld-data-provider';
+import { RegistrarDataProvider } from './data/registrar-data-provider';
 import { detectPrivacy } from './detection/privacy-detector';
 import { LlmFormatter } from './formatting/llm-formatter';
 
@@ -167,11 +169,26 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
 
   // Enrich response
   response.privacy = detectPrivacy(response);
-  response.registry = identifyRegistry(response);
 
-  // Only fetch registrar data if we might need it (not using LLM, or LLM not enabled)
+  // Use TLD data for richer registry info
+  const tldProvider = new TldDataProvider(env.A_WHOIS_CACHE_KV);
+  const tldRegistry = await identifyRegistryFromTldData(response, tldProvider);
+  if (tldRegistry) {
+    response.registry = tldRegistry;
+  } else {
+    response.registry = identifyRegistry(response);
+  }
+
+  // Use registrar data for richer registrar info
   const llmAvailable = useLlm && env.DEEPSEEK_API_KEY;
-  if (!llmAvailable || !rawResponse) {
+  const registrarDataProvider = new RegistrarDataProvider(env.A_WHOIS_CACHE_KV);
+
+  if (response.registrar?.ianaId || response.registrar?.name) {
+    const enriched = await identifyRegistrarFromData(response, registrarDataProvider);
+    if (enriched) response.registrar = enriched;
+  }
+
+  if (!response.registrar?.name && !llmAvailable) {
     const registrarProvider = new RegistrarProvider(env.A_WHOIS_CACHE_KV);
     response.registrar = await identifyRegistrar(response, registrarProvider);
   }
@@ -203,8 +220,13 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
 
     // LLM didn't run or failed, fill registrar if missing
     if (!response.registrar?.name) {
-      const registrarProvider = new RegistrarProvider(env.A_WHOIS_CACHE_KV);
-      response.registrar = await identifyRegistrar(response, registrarProvider);
+      const enriched = await identifyRegistrarFromData(response, registrarDataProvider);
+      if (enriched) response.registrar = enriched;
+
+      if (!response.registrar?.name) {
+        const registrarProvider = new RegistrarProvider(env.A_WHOIS_CACHE_KV);
+        response.registrar = await identifyRegistrar(response, registrarProvider);
+      }
     }
   }
 
