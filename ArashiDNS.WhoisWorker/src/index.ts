@@ -789,6 +789,7 @@ const HTML_PAGE = `<!DOCTYPE html>
             margin-top: 1.5rem;
             padding-top: 1.25rem;
             border-top: 1px solid #e7e5e4;
+            flex-wrap: wrap;
         }
 
         .btn-action {
@@ -983,7 +984,16 @@ const HTML_PAGE = `<!DOCTYPE html>
                 grid-template-columns: 1fr;
             }
             .actions-row {
-                flex-direction: column;
+                gap: 0.5rem;
+            }
+            .btn-action {
+                flex: 1;
+                justify-content: center;
+                min-width: 0;
+            }
+            .btn-raw {
+                margin-left: 0;
+                order: 3;
             }
         }
     </style>
@@ -1233,7 +1243,7 @@ const HTML_PAGE = `<!DOCTYPE html>
                     html += '<div class="section"><div class="section-label">Domain</div><div class="info-grid">';
 
                 // Registrar
-                if (data.registrar && typeof data.registrar === 'object') {
+                if (data.registrar && typeof data.registrar === 'object' && data.registrar.name) {
                     const r = data.registrar;
                     html += '<div class="info-item has-toggle"><div class="info-item-head"><div><div class="info-key">Registrar</div><div class="info-val">' + esc(r.name) + '</div></div><button class="toggle-btn" onclick="this.classList.toggle(\\'open\\');var d=this.closest(\\'.has-toggle\\').querySelector(\\'.toggle-detail\\');d.classList.toggle(\\'open\\')">' + TB + '</button></div><div class="toggle-detail">';
                     if (r.website) html += '<div class="info-item full"><div class="info-key">Website</div><a class="info-val" href="' + esc(r.website) + '" target="_blank" rel="noopener" style="color:#78716c;text-decoration:underline">' + esc(r.website) + '</a></div>';
@@ -1248,12 +1258,12 @@ const HTML_PAGE = `<!DOCTYPE html>
                         if (r.contact.phone) html += ii('Phone', r.contact.phone);
                     }
                     html += '</div></div>';
-                } else {
-                    html += ii('Registrar', esc(data.registrar));
+                } else if (data.registrar && typeof data.registrar === 'string' && data.registrar.trim()) {
+                    html += ii('Registrar', data.registrar);
                 }
 
                 // Registry
-                if (data.registry && typeof data.registry === 'object') {
+                if (data.registry && typeof data.registry === 'object' && data.registry.name) {
                     const g = data.registry;
                     html += '<div class="info-item has-toggle"><div class="info-item-head"><div><div class="info-key">Registry</div><div class="info-val">' + esc(g.name) + '</div></div><button class="toggle-btn" onclick="this.classList.toggle(\\'open\\');var d=this.closest(\\'.has-toggle\\').querySelector(\\'.toggle-detail\\');d.classList.toggle(\\'open\\')">' + TB + '</button></div><div class="toggle-detail">';
                     if (g.website) html += '<div class="info-item full"><div class="info-key">Website</div><a class="info-val" href="' + esc(g.website) + '" target="_blank" rel="noopener" style="color:#78716c;text-decoration:underline">' + esc(g.website) + '</a></div>';
@@ -1273,8 +1283,8 @@ const HTML_PAGE = `<!DOCTYPE html>
                     }
                     if (g.sponsoringOrganisation) html += '<div class="info-item full"><div class="info-key">Sponsoring Organisation</div><div class="info-val">' + esc(g.sponsoringOrganisation) + '</div></div>';
                     html += '</div></div>';
-                } else if (data.registry) {
-                    html += ii('Registry', esc(data.registry));
+                } else if (data.registry && typeof data.registry === 'string' && data.registry.trim()) {
+                    html += ii('Registry', data.registry);
                 }
 
                 html += '</div></div>';
