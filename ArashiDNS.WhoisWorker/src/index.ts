@@ -356,7 +356,6 @@ const HTML_PAGE = `<!DOCTYPE html>
             font-weight: 600;
             color: #78716c;
             letter-spacing: 0.08em;
-            text-transform: uppercase;
             margin-bottom: 0.5rem;
         }
 
