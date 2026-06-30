@@ -4,7 +4,7 @@ import { TldDataProvider } from './tld-data-provider';
 import { RegistrarDataProvider } from './registrar-data-provider';
 
 const REGISTRARS_URL = 'https://www.iana.org/assignments/registrar-ids/registrar-ids.xhtml';
-const CACHE_TTL = 60 * 60 * 24 * 7; // 7 days
+const CACHE_TTL = 60 * 60 * 24 * 30; // 30 days
 
 export class RegistrarProvider {
   private kv: KVNamespace;

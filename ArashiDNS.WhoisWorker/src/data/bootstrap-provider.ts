@@ -11,168 +11,120 @@ interface AsnRdapRange {
   url: string;
 }
 
+interface BootstrapCache {
+  dns: Record<string, string>;
+  ipv4: IpRdapRange[];
+  ipv6: IpRdapRange[];
+  asn: AsnRdapRange[];
+  fetchedAt: number;
+}
+
 const DNS_BOOTSTRAP_URL = "https://data.iana.org/rdap/dns.json";
 const IPV4_BOOTSTRAP_URL = "https://data.iana.org/rdap/ipv4.json";
 const IPV6_BOOTSTRAP_URL = "https://data.iana.org/rdap/ipv6.json";
 const ASN_BOOTSTRAP_URL = "https://data.iana.org/rdap/asn.json";
-const CACHE_TTL = 60 * 60 * 24 * 7; // 7 days in seconds
+const CACHE_KEY = "rdap_bootstrap_all";
+const CACHE_TTL = 60 * 60 * 24 * 30; // 30 days
 
 export class BootstrapProvider {
   private kv: KVNamespace;
-  private dnsEndpoints: Map<string, string> | null = null;
-  private ipv4Endpoints: IpRdapRange[] | null = null;
-  private ipv6Endpoints: IpRdapRange[] | null = null;
-  private asnEndpoints: AsnRdapRange[] | null = null;
+  private cache: BootstrapCache | null = null;
 
   constructor(kv: KVNamespace) {
     this.kv = kv;
   }
 
   async getDnsRdapEndpoint(tld: string): Promise<string | null> {
-    await this.ensureDnsEndpoints();
-    return this.dnsEndpoints?.get(tld.toLowerCase()) ?? null;
+    await this.ensureLoaded();
+    return this.cache?.dns[tld.toLowerCase()] ?? null;
   }
 
   async getIpRdapEndpoint(ip: string): Promise<string | null> {
-    await this.ensureIpEndpoints();
-    if (ip.includes(':')) {
-      return this.findIpv6Endpoint(ip);
-    }
+    await this.ensureLoaded();
+    if (ip.includes(':')) return this.findIpv6Endpoint(ip);
     return this.findIpv4Endpoint(ip);
   }
 
   async getAsnRdapEndpoint(asn: number): Promise<string | null> {
-    await this.ensureAsnEndpoints();
-    return this.asnEndpoints?.find(r => asn >= r.start && asn <= r.end)?.url ?? null;
+    await this.ensureLoaded();
+    return this.cache?.asn.find(r => asn >= r.start && asn <= r.end)?.url ?? null;
   }
 
-  private async ensureDnsEndpoints(): Promise<void> {
-    if (this.dnsEndpoints) return;
+  private async ensureLoaded(): Promise<void> {
+    if (this.cache) return;
 
-    const cached = await this.kv.get("rdap_bootstrap_dns", "json");
-    if (cached) {
-      this.dnsEndpoints = new Map(Object.entries(cached as Record<string, string>));
+    const cached = await this.kv.get<BootstrapCache>(CACHE_KEY, 'json');
+    if (cached && cached.dns && cached.ipv4 && cached.ipv6 && cached.asn) {
+      this.cache = cached;
       return;
     }
 
     try {
-      const resp = await fetch(DNS_BOOTSTRAP_URL);
-      const data = await resp.json() as { services: [string[], string[]][] };
-      const map: Record<string, string> = {};
+      const [dnsJson, ipv4Json, ipv6Json, asnJson] = await Promise.all([
+        fetch(DNS_BOOTSTRAP_URL).then(r => r.json()) as Promise<{ services: [string[], string[]][] }>,
+        fetch(IPV4_BOOTSTRAP_URL).then(r => r.json()) as Promise<{ services: [string[], string[]][] }>,
+        fetch(IPV6_BOOTSTRAP_URL).then(r => r.json()) as Promise<{ services: [string[], string[]][] }>,
+        fetch(ASN_BOOTSTRAP_URL).then(r => r.json()) as Promise<{ services: [string[], string[]][] }>,
+      ]);
 
-      for (const [tlds, urls] of data.services) {
+      const dns: Record<string, string> = {};
+      for (const [tlds, urls] of dnsJson.services) {
         if (urls.length > 0) {
-          const url = urls[0];
-          for (const tld of tlds) {
-            map[tld.toLowerCase()] = url;
-          }
+          for (const tld of tlds) dns[tld.toLowerCase()] = urls[0];
         }
       }
 
-      this.dnsEndpoints = new Map(Object.entries(map));
-      await this.kv.put("rdap_bootstrap_dns", JSON.stringify(map), { expirationTtl: CACHE_TTL });
-    } catch {
-      this.dnsEndpoints = new Map();
-    }
-  }
+      const parseIpRanges = (data: { services: [string[], string[]][] }): IpRdapRange[] => {
+        const ranges: IpRdapRange[] = [];
+        for (const [prefixes, urls] of data.services) {
+          if (urls.length > 0) {
+            for (const prefix of prefixes) ranges.push({ prefix, url: urls[0] });
+          }
+        }
+        return ranges;
+      };
 
-  private async ensureIpEndpoints(): Promise<void> {
-    if (this.ipv4Endpoints && this.ipv6Endpoints) return;
-
-    const [cachedV4, cachedV6] = await Promise.all([
-      this.kv.get("rdap_bootstrap_ipv4", "json"),
-      this.kv.get("rdap_bootstrap_ipv6", "json"),
-    ]);
-
-    if (cachedV4 && cachedV6) {
-      this.ipv4Endpoints = cachedV4 as IpRdapRange[];
-      this.ipv6Endpoints = cachedV6 as IpRdapRange[];
-      return;
-    }
-
-    try {
-      const [v4, v6] = await Promise.all([
-        this.loadIpBootstrap(IPV4_BOOTSTRAP_URL),
-        this.loadIpBootstrap(IPV6_BOOTSTRAP_URL),
-      ]);
-
-      this.ipv4Endpoints = v4;
-      this.ipv6Endpoints = v6;
-
-      await Promise.all([
-        this.kv.put("rdap_bootstrap_ipv4", JSON.stringify(v4), { expirationTtl: CACHE_TTL }),
-        this.kv.put("rdap_bootstrap_ipv6", JSON.stringify(v6), { expirationTtl: CACHE_TTL }),
-      ]);
-    } catch {
-      this.ipv4Endpoints = [];
-      this.ipv6Endpoints = [];
-    }
-  }
-
-  private async ensureAsnEndpoints(): Promise<void> {
-    if (this.asnEndpoints) return;
-
-    const cached = await this.kv.get("rdap_bootstrap_asn", "json");
-    if (cached) {
-      this.asnEndpoints = cached as AsnRdapRange[];
-      return;
-    }
-
-    try {
-      const resp = await fetch(ASN_BOOTSTRAP_URL);
-      const data = await resp.json() as { services: [string[], string[]][] };
-      const ranges: AsnRdapRange[] = [];
-
-      for (const [asnRanges, urls] of data.services) {
-        if (urls.length > 0) {
-          const url = urls[0];
-          for (const rangeStr of asnRanges) {
-            const parts = rangeStr.split('-');
-            if (parts.length === 2) {
-              const start = parseInt(parts[0], 10);
-              const end = parseInt(parts[1], 10);
-              if (!isNaN(start) && !isNaN(end)) {
-                ranges.push({ start, end, url });
+      const parseAsnRanges = (data: { services: [string[], string[]][] }): AsnRdapRange[] => {
+        const ranges: AsnRdapRange[] = [];
+        for (const [asnRanges, urls] of data.services) {
+          if (urls.length > 0) {
+            for (const rangeStr of asnRanges) {
+              const parts = rangeStr.split('-');
+              if (parts.length === 2) {
+                const start = parseInt(parts[0], 10);
+                const end = parseInt(parts[1], 10);
+                if (!isNaN(start) && !isNaN(end)) ranges.push({ start, end, url: urls[0] });
               }
             }
           }
         }
-      }
+        return ranges;
+      };
 
-      this.asnEndpoints = ranges;
-      await this.kv.put("rdap_bootstrap_asn", JSON.stringify(ranges), { expirationTtl: CACHE_TTL });
+      this.cache = {
+        dns,
+        ipv4: parseIpRanges(ipv4Json),
+        ipv6: parseIpRanges(ipv6Json),
+        asn: parseAsnRanges(asnJson),
+        fetchedAt: Date.now(),
+      };
+
+      await this.kv.put(CACHE_KEY, JSON.stringify(this.cache), { expirationTtl: CACHE_TTL });
     } catch {
-      this.asnEndpoints = [];
+      this.cache = { dns: {}, ipv4: [], ipv6: [], asn: [], fetchedAt: 0 };
     }
-  }
-
-  private async loadIpBootstrap(url: string): Promise<IpRdapRange[]> {
-    const resp = await fetch(url);
-    const data = await resp.json() as { services: [string[], string[]][] };
-    const ranges: IpRdapRange[] = [];
-
-    for (const [prefixes, urls] of data.services) {
-      if (urls.length > 0) {
-        const rdapUrl = urls[0];
-        for (const prefix of prefixes) {
-          ranges.push({ prefix, url: rdapUrl });
-        }
-      }
-    }
-
-    return ranges;
   }
 
   private findIpv4Endpoint(ip: string): string | null {
-    if (!this.ipv4Endpoints) return null;
+    if (!this.cache) return null;
     const parts = ip.split('.');
     if (parts.length < 1) return null;
     const prefix = `${parts[0]}.0.0.0/8`;
-    return this.ipv4Endpoints.find(r => r.prefix === prefix)?.url ?? null;
+    return this.cache.ipv4.find(r => r.prefix === prefix)?.url ?? null;
   }
 
   private findIpv6Endpoint(ip: string): string | null {
-    if (!this.ipv6Endpoints) return null;
-    return this.ipv6Endpoints.find(r => ip.startsWith(r.prefix.split('/')[0]))?.url ?? null;
+    if (!this.cache) return null;
+    return this.cache.ipv6.find(r => ip.startsWith(r.prefix.split('/')[0]))?.url ?? null;
   }
 }
