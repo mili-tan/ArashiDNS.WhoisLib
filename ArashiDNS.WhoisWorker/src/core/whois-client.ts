@@ -1,5 +1,6 @@
 import { connect } from 'cloudflare:sockets';
 import type { WhoisResponse, WhoisQueryType, TraceEntry, ContactInfo, ContactCollection, DomainDates, RegistrarInfo, RegistryInfo, DnssecInfo } from '../types';
+import type { TldDataProvider } from '../data/tld-data-provider';
 
 const MAX_REFERRALS = 5;
 const TCP_TIMEOUT_MS = 15000;
@@ -484,10 +485,10 @@ function parseSectionBasedWhois(raw: string): Partial<WhoisResponse> {
 }
 
 export class WhoisTcpClient {
-  async query(query: string, queryType: WhoisQueryType): Promise<{ response: WhoisResponse; trace: TraceEntry[] }> {
+  async query(query: string, queryType: WhoisQueryType, tldProvider?: TldDataProvider): Promise<{ response: WhoisResponse; trace: TraceEntry[] }> {
     const traces: TraceEntry[] = [];
     const referralChain: string[] = [];
-    let currentServer = this.getWhoisServer(query, queryType);
+    let currentServer = await this.getWhoisServer(query, queryType, tldProvider);
     let lastRawResponse: string | null = null;
 
     for (let i = 0; i < MAX_REFERRALS; i++) {
@@ -524,7 +525,7 @@ export class WhoisTcpClient {
     return { response, trace: traces };
   }
 
-  private getWhoisServer(query: string, queryType: WhoisQueryType): string {
+  private async getWhoisServer(query: string, queryType: WhoisQueryType, tldProvider?: TldDataProvider): Promise<string> {
     if (queryType === 'domain') {
       const domain = query.toLowerCase().replace(/\.$/, '');
       // Check SLD first (e.g. google.co.uk -> co.uk)
@@ -533,8 +534,16 @@ export class WhoisTcpClient {
         const sld = parts.slice(i).join('.');
         if (SLD_WHOIS_SERVERS[sld]) return SLD_WHOIS_SERVERS[sld];
       }
-      // Fallback to TLD
+
       const tld = extractTld(query);
+
+      // Check tlddata first
+      if (tldProvider) {
+        const tldInfo = await tldProvider.getTldInfo(tld);
+        if (tldInfo?.whois_server) return tldInfo.whois_server;
+      }
+
+      // Fallback to {tld}.whois-servers.net
       return `${tld}.whois-servers.net`;
     }
     if (queryType === 'ipv4' || queryType === 'ipv6') return 'whois.arin.net';

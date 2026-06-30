@@ -107,6 +107,7 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
   const mode = url.searchParams.get('mode') || 'auto'; // auto | rdap | whois
 
   const queryType = detectQueryType(query);
+  const tldProvider = new TldDataProvider(env.A_WHOIS_CACHE_KV);
 
   let response: WhoisResponse;
   let traceEntries: TraceEntry[] = [];
@@ -114,7 +115,7 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
   if (mode === 'whois') {
     // WHOIS TCP mode
     const whoisClient = new WhoisTcpClient();
-    const result = await whoisClient.query(query, queryType);
+    const result = await whoisClient.query(query, queryType, tldProvider);
     response = result.response;
     traceEntries = result.trace;
   } else if (mode === 'auto') {
@@ -127,7 +128,7 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
 
     if (!response.isSuccessful) {
       const whoisClient = new WhoisTcpClient();
-      const whoisResult = await whoisClient.query(query, queryType);
+      const whoisResult = await whoisClient.query(query, queryType, tldProvider);
       response = whoisResult.response;
       traceEntries.push(...whoisResult.trace);
     }
@@ -171,7 +172,6 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
   response.privacy = detectPrivacy(response);
 
   // Use TLD data for richer registry info
-  const tldProvider = new TldDataProvider(env.A_WHOIS_CACHE_KV);
   const tldRegistry = await identifyRegistryFromTldData(response, tldProvider);
   if (tldRegistry) {
     response.registry = tldRegistry;
@@ -1004,7 +1004,7 @@ const HTML_PAGE = `<!DOCTYPE html>
     </div>
 
     <div class="main-wrap">
-        <div class="site-title">WhoisWorker</div>
+        <div class="site-title">ArashiDNS.WhoisWorker</div>
         <h1 class="hero-title">Domain Lookup</h1>
         <p class="hero-sub">Look up domain, IP address, and ASN registration data via RDAP and WHOIS protocols.</p>
 
@@ -1061,7 +1061,7 @@ const HTML_PAGE = `<!DOCTYPE html>
     </div>
 
     <footer class="footer">
-        WhoisWorker &middot; RDAP + WHOIS &middot; For reference only
+        &copy; ArashiDNS
     </footer>
 
     <script>
