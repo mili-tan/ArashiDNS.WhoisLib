@@ -28,7 +28,9 @@ export class RegistrarDataProvider {
 
   async findById(ianaId: string): Promise<RegistrarDataEntry | null> {
     await this.ensureLoaded();
-    return this.byId?.get(ianaId) ?? null;
+    const id = ianaId?.trim();
+    if (!id || !/^\d+$/.test(id)) return null;
+    return this.byId?.get(id) ?? null;
   }
 
   async findByName(name: string): Promise<RegistrarDataEntry | null> {
@@ -72,7 +74,10 @@ export class RegistrarDataProvider {
     this.byId = new Map();
     this.byName = new Map();
     for (const entry of entries) {
-      if (entry.iana_id) this.byId.set(String(entry.iana_id), entry);
+      if (entry.iana_id) {
+        const id = String(entry.iana_id).trim();
+        if (/^\d+$/.test(id)) this.byId.set(id, entry);
+      }
       if (entry.registrar_name) this.byName.set(entry.registrar_name.toLowerCase(), entry);
     }
   }

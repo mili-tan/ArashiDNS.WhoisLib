@@ -30,8 +30,12 @@ public class RegistrarListProvider
 
     public async Task<RegistrarEntry?> FindRegistrarByIdAsync(string ianaId)
     {
+        var id = ianaId?.Trim();
+        if (string.IsNullOrEmpty(id) || !int.TryParse(id, out _))
+            return null;
+
         var registrars = await GetRegistrarsAsync();
-        return registrars.FirstOrDefault(r => r.Id == ianaId);
+        return registrars.FirstOrDefault(r => r.Id == id);
     }
 
     public async Task<RegistrarEntry?> FindRegistrarByNameAsync(string name)
