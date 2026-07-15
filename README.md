@@ -1,9 +1,10 @@
 # ArashiDNS WhoisLib
 
-A C# WHOIS/RDAP lookup library with registry/registrar identification, privacy detection, and LLM-powered formatting.
+A C# WHOIS/RDAP lookup library with multi-layer parsing, registry/registrar identification, privacy detection, and LLM-powered formatting.
 
 ## Features
 
+- **Multi-layer parsing**: Tokenizer + Regex + FieldMapping + Section + LLM
 - **WHOIS & RDAP support**: Query domain, IP, and ASN information
 - **Three-level server discovery**: Known list → DNS lookup → IANA query
 - **RDAP referral following**: Automatically follows registrar referrals
@@ -11,8 +12,52 @@ A C# WHOIS/RDAP lookup library with registry/registrar identification, privacy d
 - **Privacy protection detection**: Identifies WHOIS privacy services and reasons
 - **Contact merging**: Merges identical contact info with role array
 - **LLM formatting**: DeepSeek API integration for structured output
-- **Auto fallback**: WHOIS Traditional → WHOIS LLM (when registrar/dates empty)
+- **Auto fallback**: Multiple parsing layers with automatic fallback
 - **Local file caching**: IANA data cached for 7 days
+- **145+ server templates**: Tokenizer templates for specific WHOIS servers
+- **250+ regex patterns**: Covering 199+ weppos/whois-parser server formats
+
+## Multi-Layer Parsing Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│            MultiLayerParser (WhoisLookup)                    │
+│                                                             │
+│  Layer 1: TokenizerParser (template-based)                  │
+│           - 145+ server-specific templates (flipbit)        │
+│           - Pattern matching with transformers              │
+│                                                             │
+│  Layer 2: RegexParser (regex-based) ← Primary               │
+│           - 250+ regex patterns (weppos)                    │
+│           - Covers 199+ WHOIS server formats                │
+│                                                             │
+│  Layer 3: TraditionalFormatter (field mapping)              │
+│           - Original implementation, backward compatible    │
+│                                                             │
+│  Layer 4: SectionParser (section-based)                     │
+│           - Handles .kg, .cn, and similar formats           │
+│                                                             │
+│  Layer 5: LlmFormatter (LLM-based)                         │
+│           - DeepSeek API integration, final fallback        │
+│                                                             │
+│  PostProcessors:                                            │
+│           - AvailabilityDetector (not registered detection) │
+│           - GeoNormalizer (country/region standardization)  │
+│           - PrivacyDetector (privacy service detection)     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Parsing Trace
+
+The `MultiLayerFormatter` reports which layer and parser was used:
+
+```
+Trace: MultiLayer(Regex/RegexParser:15fields)
+Trace: MultiLayer(Tokenizer/TemplateParser:12fields)
+Trace: MultiLayer(Traditional/FieldMapping:10fields)
+Trace: MultiLayer(LLM/DeepSeek:18fields)
+```
 
 ## Quick Start
 
@@ -205,10 +250,33 @@ ArashiDNS.WhoisLib/
 ├── Data/               # IANA data providers and cache
 ├── Detection/          # Privacy and registry detection
 ├── Formatting/         # Traditional and LLM formatters
+├── Parsing/            # Multi-layer parsing engine
+│   ├── Templates/      # Tokenizer templates (145+ servers)
+│   ├── RegexParser.cs  # Regex-based parser (250+ patterns)
+│   ├── TokenizerParser.cs  # Template-based parser
+│   ├── MultiLayerParser.cs # Multi-layer orchestrator
+│   ├── AvailabilityDetector.cs  # Not-registered detection
+│   └── GeoNormalizer.cs  # Country/region normalization
 └── ServerDiscovery/    # Server lookup implementations
 
 ArashiDNS.WhoisCLI/    # CLI demo application
 ```
+
+## Acknowledgments
+
+This project's parsing engine is inspired by and references the following open-source projects:
+
+| Project | Language | Reference |
+|---------|----------|-----------|
+| [weppos/whois](https://github.com/weppos/whois) | Ruby | WHOIS client architecture, server discovery |
+| [weppos/whois-parser](https://github.com/weppos/whois-parser) | Ruby | 199+ server-specific parsers, field patterns, Scanner/Tokenizer pattern |
+| [flipbit/whois](https://github.com/flipbit/whois) | .NET | Tokenizer template-based parsing, 145+ server templates |
+
+### What we learned from each project:
+
+- **weppos/whois**: Clean separation of client/parser, `property_supported` pattern, `available?`/`registered?` state detection
+- **weppos/whois-parser**: Per-server parser classes, Scanner-based tokenization, comprehensive field mappings for 199+ WHOIS servers
+- **flipbit/whois**: Tokenizer template syntax (`{ FieldName : Transformer }`), template matching with fallback, `CleanDomainStatus`/`ToHostName` transformers
 
 ## License
 

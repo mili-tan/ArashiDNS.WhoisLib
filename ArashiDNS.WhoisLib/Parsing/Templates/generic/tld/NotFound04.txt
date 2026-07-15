@@ -1,0 +1,13 @@
+---
+#
+# Generic TLD Pattern - Not Found
+#
+name: generic/tld/NotFound004
+
+tag: catch-all
+
+set: Status = NotFound
+
+hint: Domain not found
+---
+Domain not found

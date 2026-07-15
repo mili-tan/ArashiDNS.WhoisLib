@@ -54,3 +54,6 @@ dist/
 ## Agent Skills
 .agents/
 skills-lock.json
+
+## Reference Projects (cloned for analysis)
+.reference/

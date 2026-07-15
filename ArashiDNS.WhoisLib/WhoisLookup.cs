@@ -12,8 +12,7 @@ public class WhoisLookup : IDisposable
     private readonly WhoisClientOptions _options;
     private readonly WhoisClient _whoisClient;
     private readonly RdapClient _rdapClient;
-    private readonly TraditionalFormatter _traditionalFormatter;
-    private readonly LlmFormatter? _llmFormatter;
+    private readonly MultiLayerFormatter _formatter;
     private bool _disposed;
 
     public WhoisLookup(WhoisClientOptions? options = null)
@@ -32,12 +31,14 @@ public class WhoisLookup : IDisposable
 
         _whoisClient = new WhoisClient(serverFinder);
         _rdapClient = new RdapClient(bootstrapProvider: rdapBootstrap, userAgent: _options.UserAgent);
-        _traditionalFormatter = new TraditionalFormatter(registrarProvider);
 
+        var traditionalFormatter = new TraditionalFormatter(registrarProvider);
+
+        LlmFormatter? llmFormatter = null;
         var apiKey = _options.LlmApiKey ?? Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
         if (!string.IsNullOrEmpty(apiKey))
         {
-            _llmFormatter = new LlmFormatter(new LlmFormatterOptions
+            llmFormatter = new LlmFormatter(new LlmFormatterOptions
             {
                 ApiKey = apiKey,
                 ApiEndpoint = _options.LlmApiEndpoint ?? "https://api.deepseek.com/chat/completions",
@@ -45,20 +46,22 @@ public class WhoisLookup : IDisposable
                 EnableThinking = _options.LlmEnableThinking
             });
         }
+
+        _formatter = new MultiLayerFormatter(traditionalFormatter, llmFormatter, registrarProvider);
     }
 
     public async Task<QueryResult> QueryAsync(string query)
     {
         return _options.Strategy switch
         {
-            QueryStrategy.RdapFirst => await RunAsync(query, Steps.RdapTrad, Steps.WhoisTrad, Steps.WhoisLlm),
-            QueryStrategy.WhoisFirst => await RunAsync(query, Steps.WhoisTrad, Steps.RdapTrad, Steps.WhoisLlm),
-            QueryStrategy.RdapFirstWhoisLlmFallback => await RunAsync(query, Steps.RdapTrad, Steps.WhoisLlm),
-            QueryStrategy.RdapTraditionOnly => await RunAsync(query, Steps.RdapTrad),
-            QueryStrategy.WhoisTraditionOnly => await RunAsync(query, Steps.WhoisTrad),
-            QueryStrategy.RdapLlmOnly => await RunAsync(query, Steps.RdapLlm),
-            QueryStrategy.WhoisLlmOnly => await RunAsync(query, Steps.WhoisLlm),
-            _ => await RunAsync(query, Steps.RdapTrad, Steps.WhoisTrad, Steps.WhoisLlm)
+            QueryStrategy.RdapFirst => await RunAsync(query, Steps.Rdap, Steps.Whois),
+            QueryStrategy.WhoisFirst => await RunAsync(query, Steps.Whois, Steps.Rdap),
+            QueryStrategy.RdapFirstWhoisLlmFallback => await RunAsync(query, Steps.Rdap, Steps.Whois),
+            QueryStrategy.RdapTraditionOnly => await RunAsync(query, Steps.Rdap),
+            QueryStrategy.WhoisTraditionOnly => await RunAsync(query, Steps.Whois),
+            QueryStrategy.RdapLlmOnly => await RunAsync(query, Steps.Rdap),
+            QueryStrategy.WhoisLlmOnly => await RunAsync(query, Steps.Whois),
+            _ => await RunAsync(query, Steps.Rdap, Steps.Whois)
         };
     }
 
@@ -68,57 +71,113 @@ public class WhoisLookup : IDisposable
         _rdapClient.OnRequest = (endpoint, success, error) =>
             trace.Add(new TraceEntry { Protocol = "RDAP", Endpoint = endpoint, Success = success, Error = error });
 
-        WhoisResponse? cachedWhoisResponse = null;
-
-        for (int i = 0; i < steps.Length; i++)
+        foreach (var step in steps)
         {
-            var step = steps[i];
-            QueryResult result;
-
-            switch (step)
+            QueryResult result = step switch
             {
-                case Steps.RdapTrad:
-                    result = await TryRdapTraditionalAsync(query, trace);
-                    break;
-                case Steps.WhoisTrad:
-                    var whoisResult = await TryWhoisTraditionalAsync(query, trace);
-                    cachedWhoisResponse = whoisResult.WhoisResponse;
-                    result = whoisResult.Result;
-                    break;
-                case Steps.RdapLlm:
-                    result = await TryRdapLlmAsync(query, trace);
-                    break;
-                case Steps.WhoisLlm:
-                    result = await TryWhoisLlmAsync(query, trace, cachedWhoisResponse);
-                    break;
-                default:
-                    result = new QueryResult { IsSuccessful = false };
-                    break;
-            }
+                Steps.Rdap => await TryRdapAsync(query, trace),
+                Steps.Whois => await TryWhoisAsync(query, trace),
+                _ => new QueryResult { IsSuccessful = false }
+            };
 
             result.Trace = trace;
 
             if (result.IsSuccessful)
-            {
-                // For WHOIS with Traditional formatter, check if we should fallback to LLM
-                if (step == Steps.WhoisTrad && _llmFormatter != null && ShouldFallbackToLlm(result))
-                {
-                    trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = "Traditional", Success = true, Error = "Empty registrar/dates, falling back to LLM" });
-
-                    // Try LLM fallback with cached WHOIS response (no duplicate request)
-                    var llmResult = await TryWhoisLlmAsync(query, trace, cachedWhoisResponse);
-                    if (llmResult.IsSuccessful && !ShouldFallbackToLlm(llmResult))
-                    {
-                        llmResult.Trace = trace;
-                        return PostProcess(llmResult);
-                    }
-                }
-
                 return PostProcess(result);
-            }
         }
 
         return new QueryResult { IsSuccessful = false, ErrorMessage = "All query methods failed", Trace = trace };
+    }
+
+    private async Task<QueryResult> TryRdapAsync(string query, List<TraceEntry> trace)
+    {
+        try
+        {
+            WhoisResponse response;
+
+            if (!string.IsNullOrEmpty(_options.CustomRdapEndpoint))
+                response = await _rdapClient.QueryAsync(query, _options.CustomRdapEndpoint);
+            else
+                response = await _rdapClient.QueryAsync(query);
+
+            if (!response.IsSuccessful)
+            {
+                trace.Add(new TraceEntry
+                {
+                    Protocol = "RDAP", Endpoint = response.WhoisServer,
+                    Formatter = "MultiLayer", Success = false, Error = response.ErrorMessage
+                });
+                return new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage };
+            }
+
+            var result = await _formatter.FormatAsync(response);
+
+            var traceFormatter = $"MultiLayer({_formatter.LastUsedLayer}/{_formatter.LastParserName}:{_formatter.LastMatchedFieldCount}fields)";
+            trace.Add(new TraceEntry
+            {
+                Protocol = "RDAP", Endpoint = response.WhoisServer,
+                Formatter = traceFormatter, Success = true
+            });
+
+            return new QueryResult
+            {
+                Data = result,
+                RawResponse = response.RawResponse,
+                UsedProtocol = "RDAP", UsedFormatter = traceFormatter,
+                FinalEndpoint = response.WhoisServer, IsSuccessful = true
+            };
+        }
+        catch (Exception ex)
+        {
+            trace.Add(new TraceEntry { Protocol = "RDAP", Formatter = "MultiLayer", Success = false, Error = ex.Message });
+            return new QueryResult { IsSuccessful = false, ErrorMessage = ex.Message };
+        }
+    }
+
+    private async Task<QueryResult> TryWhoisAsync(string query, List<TraceEntry> trace)
+    {
+        try
+        {
+            WhoisResponse response;
+
+            if (!string.IsNullOrEmpty(_options.CustomWhoisServer))
+                response = await _whoisClient.QueryAsync(query, _options.CustomWhoisServer);
+            else
+                response = await _whoisClient.QueryAsync(query);
+
+            foreach (var server in response.ReferralChain)
+            {
+                trace.Add(new TraceEntry
+                {
+                    Protocol = "WHOIS", Endpoint = server,
+                    Formatter = "MultiLayer", Success = response.IsSuccessful
+                });
+            }
+
+            if (!response.IsSuccessful)
+            {
+                trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = "MultiLayer", Success = false, Error = response.ErrorMessage });
+                return new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage };
+            }
+
+            var result = await _formatter.FormatAsync(response);
+
+            var traceFormatter = $"MultiLayer({_formatter.LastUsedLayer}/{_formatter.LastParserName}:{_formatter.LastMatchedFieldCount}fields)";
+            trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = traceFormatter, Success = true, Endpoint = response.WhoisServer });
+
+            return new QueryResult
+            {
+                Data = result,
+                RawResponse = response.RawResponse,
+                UsedProtocol = "WHOIS", UsedFormatter = traceFormatter,
+                FinalEndpoint = response.WhoisServer, IsSuccessful = true
+            };
+        }
+        catch (Exception ex)
+        {
+            trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = "MultiLayer", Success = false, Error = ex.Message });
+            return new QueryResult { IsSuccessful = false, ErrorMessage = ex.Message };
+        }
     }
 
     private QueryResult PostProcess(QueryResult result)
@@ -136,194 +195,7 @@ public class WhoisLookup : IDisposable
         return result;
     }
 
-    private static bool ShouldFallbackToLlm(QueryResult result)
-    {
-        var hasRegistrar = result.Data?.Registrar != null &&
-                           !string.IsNullOrEmpty(result.Data.Registrar.Name);
-        var hasExpiration = result.Data?.Dates?.Expires != null;
-        return !hasRegistrar && !hasExpiration;
-    }
-
-    private async Task<QueryResult> TryRdapTraditionalAsync(string query, List<TraceEntry> trace)
-    {
-        try
-        {
-            WhoisResponse response;
-            
-            if (!string.IsNullOrEmpty(_options.CustomRdapEndpoint))
-            {
-                // Use custom RDAP endpoint
-                response = await _rdapClient.QueryAsync(query, _options.CustomRdapEndpoint);
-            }
-            else
-            {
-                response = await _rdapClient.QueryAsync(query);
-            }
-            
-            trace.Add(new TraceEntry
-            {
-                Protocol = "RDAP", Endpoint = response.WhoisServer,
-                Formatter = "Traditional", Success = response.IsSuccessful, Error = response.ErrorMessage
-            });
-
-            if (!response.IsSuccessful)
-                return new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage };
-
-            return new QueryResult
-            {
-                Data = await _traditionalFormatter.FormatAsync(response),
-                RawResponse = response.RawResponse,
-                UsedProtocol = "RDAP", UsedFormatter = "Traditional",
-                FinalEndpoint = response.WhoisServer, IsSuccessful = true
-            };
-        }
-        catch (Exception ex)
-        {
-            trace.Add(new TraceEntry { Protocol = "RDAP", Formatter = "Traditional", Success = false, Error = ex.Message });
-            return new QueryResult { IsSuccessful = false, ErrorMessage = ex.Message };
-        }
-    }
-
-    private async Task<(QueryResult Result, WhoisResponse? WhoisResponse)> TryWhoisTraditionalAsync(string query, List<TraceEntry> trace)
-    {
-        try
-        {
-            WhoisResponse response;
-            
-            if (!string.IsNullOrEmpty(_options.CustomWhoisServer))
-            {
-                // Use custom WHOIS server
-                response = await _whoisClient.QueryAsync(query, _options.CustomWhoisServer);
-            }
-            else
-            {
-                response = await _whoisClient.QueryAsync(query);
-            }
-
-            foreach (var server in response.ReferralChain)
-            {
-                trace.Add(new TraceEntry
-                {
-                    Protocol = "WHOIS", Endpoint = server,
-                    Formatter = "Traditional", Success = response.IsSuccessful
-                });
-            }
-
-            if (!response.IsSuccessful)
-            {
-                trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = "Traditional", Success = false, Error = response.ErrorMessage });
-                return (new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage }, null);
-            }
-
-            var result = await _traditionalFormatter.FormatAsync(response);
-            trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = "Traditional", Success = true, Endpoint = response.WhoisServer });
-
-            return (new QueryResult
-            {
-                Data = result,
-                RawResponse = response.RawResponse,
-                UsedProtocol = "WHOIS", UsedFormatter = "Traditional",
-                FinalEndpoint = response.WhoisServer, IsSuccessful = true
-            }, response);
-        }
-        catch (Exception ex)
-        {
-            trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = "Traditional", Success = false, Error = ex.Message });
-            return (new QueryResult { IsSuccessful = false, ErrorMessage = ex.Message }, null);
-        }
-    }
-
-    private async Task<QueryResult> TryRdapLlmAsync(string query, List<TraceEntry> trace)
-    {
-        if (_llmFormatter == null)
-        {
-            trace.Add(new TraceEntry { Protocol = "RDAP", Formatter = "LLM", Success = false, Error = "LLM not configured" });
-            return new QueryResult { IsSuccessful = false, ErrorMessage = "LLM not configured" };
-        }
-
-        try
-        {
-            var response = await _rdapClient.QueryAsync(query);
-            trace.Add(new TraceEntry
-            {
-                Protocol = "RDAP", Endpoint = response.WhoisServer,
-                Formatter = "LLM", Success = response.IsSuccessful, Error = response.ErrorMessage
-            });
-
-            if (!response.IsSuccessful)
-                return new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage };
-
-            return new QueryResult
-            {
-                Data = await _llmFormatter.FormatAsync(response),
-                RawResponse = response.RawResponse,
-                UsedProtocol = "RDAP", UsedFormatter = "LLM",
-                FinalEndpoint = response.WhoisServer, IsSuccessful = true
-            };
-        }
-        catch (Exception ex)
-        {
-            trace.Add(new TraceEntry { Protocol = "RDAP", Formatter = "LLM", Success = false, Error = ex.Message });
-            return new QueryResult { IsSuccessful = false, ErrorMessage = ex.Message };
-        }
-    }
-
-    /// <summary>
-    /// Try WHOIS with LLM formatter. Reuses cached WHOIS response if available.
-    /// </summary>
-    private async Task<QueryResult> TryWhoisLlmAsync(string query, List<TraceEntry> trace, WhoisResponse? cachedWhois = null)
-    {
-        if (_llmFormatter == null)
-        {
-            trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = "LLM", Success = false, Error = "LLM not configured" });
-            return new QueryResult { IsSuccessful = false, ErrorMessage = "LLM not configured" };
-        }
-
-        try
-        {
-            // Reuse cached WHOIS response or make a new query
-            WhoisResponse response;
-            if (cachedWhois != null)
-            {
-                response = cachedWhois;
-                trace.Add(new TraceEntry { Protocol = "WHOIS", Endpoint = response.WhoisServer, Formatter = "LLM", Success = true, Error = "(reused)" });
-            }
-            else
-            {
-                response = await _whoisClient.QueryAsync(query);
-
-                foreach (var server in response.ReferralChain)
-                {
-                    trace.Add(new TraceEntry { Protocol = "WHOIS", Endpoint = server, Formatter = "LLM", Success = response.IsSuccessful });
-                }
-
-                if (!response.IsSuccessful)
-                {
-                    trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = "LLM", Success = false, Error = response.ErrorMessage });
-                    return new QueryResult { IsSuccessful = false, ErrorMessage = response.ErrorMessage };
-                }
-
-                trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = "LLM", Success = true, Endpoint = response.WhoisServer });
-            }
-
-            var result = await _llmFormatter.FormatAsync(response);
-
-            return new QueryResult
-            {
-                Data = result,
-                RawResponse = response.RawResponse,
-                UsedProtocol = "WHOIS", UsedFormatter = "LLM",
-                FinalEndpoint = response.WhoisServer, IsSuccessful = true
-            };
-        }
-        catch (Exception ex)
-        {
-            trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = "LLM", Success = false, Error = ex.Message });
-            return new QueryResult { IsSuccessful = false, ErrorMessage = ex.Message };
-        }
-    }
-
-    private enum Steps { RdapTrad, WhoisTrad, RdapLlm, WhoisLlm }
+    private enum Steps { Rdap, Whois }
 
     public void Dispose()
     {

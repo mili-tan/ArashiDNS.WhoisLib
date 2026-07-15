@@ -1,0 +1,13 @@
+---
+#
+# Generic TLD Pattern - Not Found
+#
+name: generic/tld/NotFound005
+
+tag: catch-all
+
+set: Status = NotFound
+
+hint: The queried object does not exist
+---
+The queried object does not exist
