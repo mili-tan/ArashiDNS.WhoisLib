@@ -34,12 +34,13 @@ export class RegistrarDataProvider {
   async findByName(name: string): Promise<RegistrarDataEntry | null> {
     await this.ensureLoaded();
     const lower = name.toLowerCase().trim();
-    // Exact match first
+    // Exact match
     if (this.byName!.has(lower)) return this.byName!.get(lower)!;
-    // Partial match: input contains key OR key contains input (min 4 chars)
-    if (lower.length >= 4) {
+    // Word match: all words (>=3 chars) from input must appear in key
+    const words = lower.split(/\s+/).filter(w => w.length >= 3);
+    if (words.length > 0) {
       for (const [key, entry] of this.byName!) {
-        if (key.length >= 4 && (key.includes(lower) || lower.includes(key))) return entry;
+        if (words.every(w => key.includes(w))) return entry;
       }
     }
     return null;
@@ -71,7 +72,7 @@ export class RegistrarDataProvider {
     this.byId = new Map();
     this.byName = new Map();
     for (const entry of entries) {
-      if (entry.iana_id) this.byId.set(entry.iana_id, entry);
+      if (entry.iana_id) this.byId.set(String(entry.iana_id), entry);
       if (entry.registrar_name) this.byName.set(entry.registrar_name.toLowerCase(), entry);
     }
   }
