@@ -112,18 +112,17 @@ public class WhoisLookup : IDisposable
 
             var result = await _formatter.FormatAsync(response);
 
-            var traceFormatter = $"MultiLayer({_formatter.LastUsedLayer}/{_formatter.LastParserName}:{_formatter.LastMatchedFieldCount}fields)";
             trace.Add(new TraceEntry
             {
                 Protocol = "RDAP", Endpoint = response.WhoisServer,
-                Formatter = traceFormatter, Success = true
+                Formatter = _formatter.LastUsedLayer, Success = true
             });
 
             return new QueryResult
             {
                 Data = result,
                 RawResponse = response.RawResponse,
-                UsedProtocol = "RDAP", UsedFormatter = traceFormatter,
+                UsedProtocol = "RDAP", UsedFormatter = _formatter.LastUsedLayer,
                 FinalEndpoint = response.WhoisServer, IsSuccessful = true
             };
         }
@@ -162,14 +161,13 @@ public class WhoisLookup : IDisposable
 
             var result = await _formatter.FormatAsync(response);
 
-            var traceFormatter = $"MultiLayer({_formatter.LastUsedLayer}/{_formatter.LastParserName}:{_formatter.LastMatchedFieldCount}fields)";
-            trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = traceFormatter, Success = true, Endpoint = response.WhoisServer });
+            trace.Add(new TraceEntry { Protocol = "WHOIS", Formatter = _formatter.LastUsedLayer, Success = true, Endpoint = response.WhoisServer });
 
             return new QueryResult
             {
                 Data = result,
                 RawResponse = response.RawResponse,
-                UsedProtocol = "WHOIS", UsedFormatter = traceFormatter,
+                UsedProtocol = "WHOIS", UsedFormatter = _formatter.LastUsedLayer,
                 FinalEndpoint = response.WhoisServer, IsSuccessful = true
             };
         }

@@ -36,8 +36,9 @@ PostProcessors: AvailabilityDetector → GeoNormalizer → PrivacyDetector
 ### Parsing Trace
 
 ```
-[OK] RDAP -> MultiLayer(Regex/RegexParser:15fields)
-[OK] WHOIS -> MultiLayer(Tokenizer/TemplateParser:12fields)
+[OK] RDAP -> Regex
+[OK] WHOIS -> Tokenizer
+[OK] WHOIS -> LLM
 ```
 
 ## Quick Start

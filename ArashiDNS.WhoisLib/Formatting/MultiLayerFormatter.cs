@@ -24,8 +24,6 @@ public class MultiLayerFormatter : IWhoisFormatter
     private readonly AvailabilityDetector _availabilityDetector;
 
     public string LastUsedLayer { get; private set; } = string.Empty;
-    public string LastParserName { get; private set; } = string.Empty;
-    public int LastMatchedFieldCount { get; private set; }
 
     public MultiLayerFormatter(
         RegistrarListProvider registrarProvider,
@@ -120,9 +118,7 @@ public class MultiLayerFormatter : IWhoisFormatter
             var fieldCount = CountFilledFields(result);
             if (fieldCount > 0)
             {
-                LastUsedLayer = "MultiLayer";
-                LastParserName = "Tokenizer+Regex";
-                LastMatchedFieldCount = fieldCount;
+                LastUsedLayer = "Tokenizer";
             }
 
             return result;
@@ -140,9 +136,7 @@ public class MultiLayerFormatter : IWhoisFormatter
             var result = await _traditionalFormatter.FormatAsync(response);
             if (HasUsefulData(result))
             {
-                LastUsedLayer = "Traditional";
-                LastParserName = "FieldMapping";
-                LastMatchedFieldCount = CountFilledFields(result);
+                LastUsedLayer = "Regex";
                 return result;
             }
             return null;
@@ -162,8 +156,6 @@ public class MultiLayerFormatter : IWhoisFormatter
         {
             var result = await _llmFormatter.FormatAsync(response);
             LastUsedLayer = "LLM";
-            LastParserName = "DeepSeek";
-            LastMatchedFieldCount = CountFilledFields(result);
             return result;
         }
         catch
@@ -364,10 +356,5 @@ public class MultiLayerFormatter : IWhoisFormatter
         }
 
         return count;
-    }
-
-    public string GetTraceInfo()
-    {
-        return $"Layer: {LastUsedLayer}, Parser: {LastParserName}, Fields: {LastMatchedFieldCount}";
     }
 }
