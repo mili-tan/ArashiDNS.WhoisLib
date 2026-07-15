@@ -38,8 +38,24 @@ public class RegistrarListProvider
     {
         var registrars = await GetRegistrarsAsync();
         var normalizedName = name.ToLowerInvariant().Trim();
-        return registrars.FirstOrDefault(r =>
-            r.Name.ToLowerInvariant().Contains(normalizedName) ||
-            normalizedName.Contains(r.Name.ToLowerInvariant()));
+
+        // Exact match first
+        var exact = registrars.FirstOrDefault(r =>
+            r.Name.ToLowerInvariant() == normalizedName);
+        if (exact != null) return exact;
+
+        // Word match: all words (>=3 chars) from input must appear in name
+        var words = normalizedName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length >= 3).ToList();
+        if (words.Count > 0)
+        {
+            return registrars.FirstOrDefault(r =>
+            {
+                var regName = r.Name.ToLowerInvariant();
+                return words.All(w => regName.Contains(w));
+            });
+        }
+
+        return null;
     }
 }

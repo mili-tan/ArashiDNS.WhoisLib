@@ -796,8 +796,9 @@ public partial class RegexParser
 
     private static Dictionary<string, List<string>> ExtractFields(string rawResponse)
     {
+        var processed = PreprocessWhois(rawResponse);
         var fields = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        var lines = rawResponse.Split('\n');
+        var lines = processed.Split('\n');
 
         foreach (var line in lines)
         {
@@ -826,6 +827,70 @@ public partial class RegexParser
         }
 
         return fields;
+    }
+
+    /// <summary>
+    /// Preprocess WHOIS response to handle section-based formats (.uk, etc.)
+    /// Merges multi-line fields and removes empty lines.
+    /// </summary>
+    private static string PreprocessWhois(string raw)
+    {
+        var lines = raw.Split('\n');
+        var result = new List<string>();
+        int i = 0;
+
+        while (i < lines.Length)
+        {
+            var line = lines[i];
+            var trimmed = line.Trim();
+
+            if (string.IsNullOrEmpty(trimmed)) { i++; continue; }
+
+            // Check if line is a field label ending with ':' (no value after it)
+            if (trimmed.EndsWith(':') && trimmed.Length > 1)
+            {
+                var nextLine = i + 1 < lines.Length ? lines[i + 1] : null;
+                if (nextLine != null)
+                {
+                    var nextTrimmed = nextLine.Trim();
+                    var nextIndent = nextLine.Length - nextLine.TrimStart().Length;
+                    var curIndent = line.Length - line.TrimStart().Length;
+
+                    if (!string.IsNullOrEmpty(nextTrimmed) && nextIndent > curIndent)
+                    {
+                        // If next line is also a label, this is a section header - skip it
+                        if (nextTrimmed.EndsWith(':') && nextTrimmed.Length > 1)
+                        {
+                            i++;
+                            continue;
+                        }
+
+                        // Merge: "Key: Value"
+                        var key = trimmed[..^1].Trim();
+                        result.Add($"{key}: {nextTrimmed}");
+                        i += 2;
+
+                        // Handle continuation lines
+                        while (i < lines.Length)
+                        {
+                            var contLine = lines[i];
+                            var contTrimmed = contLine.Trim();
+                            var contIndent = contLine.Length - contLine.TrimStart().Length;
+                            if (string.IsNullOrEmpty(contTrimmed) || contIndent <= curIndent) break;
+                            if (contTrimmed.Contains(':') && contTrimmed.Split(':')[0].Trim().Length > 1) break;
+                            if (!string.IsNullOrEmpty(contTrimmed)) result.Add($"{key}: {contTrimmed}");
+                            i++;
+                        }
+                        continue;
+                    }
+                }
+            }
+
+            result.Add(trimmed);
+            i++;
+        }
+
+        return string.Join('\n', result);
     }
 
     private static string GetFieldValue(Dictionary<string, List<string>> fields, string key)
