@@ -332,11 +332,7 @@ for (const [key, patterns] of Object.entries(FIELD_PATTERNS)) {
 }
 SORTED_PATTERNS.sort((a, b) => b[1].pattern.source.length - a[1].pattern.source.length);
 
-function preprocessSectionFormat(raw: string): string {
-  // Handle .uk-style section-based format where value is on next line:
-  //   Registrar:
-  //       GoDaddy.com, LLC. [Tag = GODADDY]
-  // Merge into single line: Registrar: GoDaddy.com, LLC. [Tag = GODADDY]
+function preprocessWhois(raw: string): string {
   const lines = raw.split('\n');
   const result: string[] = [];
   let i = 0;
@@ -345,20 +341,46 @@ function preprocessSectionFormat(raw: string): string {
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Check if this line is a field label ending with ':' (no value after it)
+    // Skip empty lines
+    if (!trimmed) { i++; continue; }
+
+    // Check if this line is a section label ending with ':' (no value after it)
+    // e.g. "Registrar:" or "Relevant dates:"
     if (trimmed.endsWith(':') && trimmed.length > 1) {
-      const afterColon = trimmed.slice(0, -1).trim();
-      // Check if next line exists and is indented (value on next line)
-      if (i + 1 < lines.length) {
-        const nextLine = lines[i + 1];
+      const nextLine = i + 1 < lines.length ? lines[i + 1] : null;
+      if (nextLine) {
         const nextTrimmed = nextLine.trim();
         const nextIndent = nextLine.length - nextLine.trimStart().length;
         const curIndent = line.length - line.trimStart().length;
 
-        if (nextTrimmed && nextIndent > curIndent && !nextTrimmed.endsWith(':')) {
+        // Next line is indented more and not empty
+        if (nextTrimmed && nextIndent > curIndent) {
+          // If next line is also a label (ends with ':'), this is a section header
+          // Don't merge - let the sub-fields be parsed individually
+          if (nextTrimmed.endsWith(':') && nextTrimmed.length > 1) {
+            // Section header like "Relevant dates:" followed by "Registered on: ..."
+            // Skip the header, process sub-fields below
+            i++;
+            continue;
+          }
+
           // Merge: "Key: Value"
-          result.push(`${afterColon}: ${nextTrimmed}`);
+          const key = trimmed.slice(0, -1).trim();
+          result.push(`${key}: ${nextTrimmed}`);
           i += 2;
+
+          // Handle multi-value fields (e.g. multiple Name Server lines under same section)
+          while (i < lines.length) {
+            const contLine = lines[i];
+            const contTrimmed = contLine.trim();
+            const contIndent = contLine.length - contLine.trimStart().length;
+            if (!contTrimmed || contIndent <= curIndent) break;
+            // If it looks like a sub-field (has colon), don't merge
+            if (contTrimmed.includes(':') && contTrimmed.split(':')[0].trim().length > 1) break;
+            // Continuation value
+            if (contTrimmed) result.push(`${key}: ${contTrimmed}`);
+            i++;
+          }
           continue;
         }
       }
@@ -372,8 +394,7 @@ function preprocessSectionFormat(raw: string): string {
 }
 
 function extractFields(rawResponse: string): Map<string, string[]> {
-  // Preprocess section-based formats (.uk, etc.)
-  const processed = preprocessSectionFormat(rawResponse);
+  const processed = preprocessWhois(rawResponse);
   const fields = new Map<string, string[]>();
   const lines = processed.split('\n');
 
