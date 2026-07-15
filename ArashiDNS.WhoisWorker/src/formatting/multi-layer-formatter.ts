@@ -1,10 +1,13 @@
-import type { WhoisResponse, FormattedResult, Env, ContactInfo, PrivacyInfo } from '../types';
+import type { WhoisResponse, FormattedResult, Env, ContactInfo } from '../types';
 import { detectPrivacy } from '../detection/privacy-detector';
 import { detectAvailability } from '../detection/availability-detector';
+import { normalizeGeo, extractCountryFromAddress } from '../detection/geo-normalizer';
+import { RegexParser } from './regex-parser';
 import { LlmFormatter } from './llm-formatter';
 import { identifyRegistry } from '../data/registry-identifier';
 
 export class MultiLayerFormatter {
+  private regexParser = new RegexParser();
   private llmFormatter: LlmFormatter | null = null;
   lastUsedLayer = '';
 
@@ -19,32 +22,37 @@ export class MultiLayerFormatter {
   }
 
   async format(response: WhoisResponse): Promise<FormattedResult> {
-    // Check availability first
+    // Layer 0: Availability check
     if (response.rawResponse) {
       const availability = detectAvailability(response.rawResponse);
       if (availability.isAvailable) {
         this.lastUsedLayer = 'Availability';
         return {
           domain: response.query,
-          registry: null,
-          registrar: null,
+          registry: null, registrar: null,
           privacy: { isPrivate: false, provider: null },
-          contacts: [],
-          dates: null,
-          nameServers: [],
-          status: ['available'],
-          dnssec: null,
+          contacts: [], dates: null, nameServers: [],
+          status: ['available'], dnssec: null,
         };
       }
     }
 
-    // Layer 1: Traditional (already parsed in whois-client.ts)
-    if (this.hasUsefulData(response)) {
-      this.lastUsedLayer = 'Traditional';
-      return this.buildResult(response);
+    // Layer 1: Regex parser (primary)
+    if (response.rawResponse) {
+      const regexResult = this.regexParser.parse(response.rawResponse, response.query, response.queryType);
+      if (regexResult && this.hasUsefulData(regexResult)) {
+        this.lastUsedLayer = 'Regex';
+        return this.postProcess(regexResult);
+      }
     }
 
-    // Layer 2: LLM fallback
+    // Layer 2: Traditional (already parsed in whois-client.ts)
+    if (this.hasUsefulData(response)) {
+      this.lastUsedLayer = 'Traditional';
+      return this.postProcess(response);
+    }
+
+    // Layer 3: LLM fallback
     if (this.llmFormatter?.isEnabled && response.rawResponse) {
       const llmResult = await this.llmFormatter.format(response.rawResponse);
       if (llmResult) {
@@ -55,7 +63,7 @@ export class MultiLayerFormatter {
 
     // Fallback
     this.lastUsedLayer = 'Fallback';
-    return this.buildResult(response);
+    return this.postProcess(response);
   }
 
   private hasUsefulData(response: WhoisResponse): boolean {
@@ -66,24 +74,25 @@ export class MultiLayerFormatter {
     if (response.registrar?.name) return true;
 
     const contacts = [
-      response.contacts.registrant,
-      response.contacts.admin,
-      response.contacts.tech,
-      response.contacts.billing,
+      response.contacts.registrant, response.contacts.admin,
+      response.contacts.tech, response.contacts.billing,
     ].filter(Boolean);
 
     for (const c of contacts) {
       if (c && (c.name || c.organization || c.email)) return true;
     }
-
     return false;
   }
 
-  private buildResult(response: WhoisResponse): FormattedResult {
+  private postProcess(response: WhoisResponse): FormattedResult {
+    // Privacy detection
     const privacy = detectPrivacy(response);
+
+    // Registry identification
     const registry = identifyRegistry(response);
 
-    const contacts = this.mergeContacts(response.contacts);
+    // Geo normalization for contacts
+    const contacts = this.mergeAndNormalizeContacts(response.contacts);
 
     return {
       domain: response.domain || response.query,
@@ -98,7 +107,7 @@ export class MultiLayerFormatter {
     };
   }
 
-  private mergeContacts(contacts: {
+  private mergeAndNormalizeContacts(contacts: {
     registrant?: ContactInfo | null;
     admin?: ContactInfo | null;
     tech?: ContactInfo | null;
@@ -116,6 +125,16 @@ export class MultiLayerFormatter {
 
     for (const [contact, role] of entries) {
       if (!contact) continue;
+
+      // Geo normalize
+      if (contact.country) {
+        const geo = normalizeGeo(contact.country);
+        if (geo.countryCode) contact.country = geo.countryCode;
+      } else if (contact.street) {
+        const countryCode = extractCountryFromAddress(contact.street);
+        if (countryCode) contact.country = countryCode;
+      }
+
       const hash = this.contactHash(contact);
       const existing = processed.get(hash);
       if (existing) {

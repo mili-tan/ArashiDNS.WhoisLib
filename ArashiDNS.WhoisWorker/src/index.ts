@@ -1408,6 +1408,7 @@ export default {
         status: 'ok',
         llm: !!env.DEEPSEEK_API_KEY,
         modes: ['rdap', 'whois', 'auto'],
+        parsing: ['Regex', 'Traditional', 'LLM', 'Availability', 'GeoNormalize'],
       }, 200, origin);
     }
 
