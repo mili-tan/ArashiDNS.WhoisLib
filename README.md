@@ -1,21 +1,24 @@
 # ArashiDNS WhoisLib
 
-A C# WHOIS/RDAP lookup library with multi-layer parsing, registry/registrar identification, privacy detection, and LLM-powered formatting.
+A C# WHOIS/RDAP lookup library with multi-layer parsing, registry/registrar identification, privacy detection, and LLM-powered formatting. Includes a Cloudflare Worker HTTP API version.
 
 ## Features
 
-- **Multi-layer parsing**: Tokenizer + Regex + FieldMapping + Section + LLM
+- **Multi-layer parsing**: Regex + FieldMapping + Section + LLM
 - **WHOIS & RDAP support**: Query domain, IP, and ASN information
 - **Three-level server discovery**: Known list → DNS lookup → IANA query
 - **RDAP referral following**: Automatically follows registrar referrals
-- **Registry/Registrar identification**: With official websites from IANA data
+- **WHOIS referral following**: Up to 5 hops with loop detection
+- **SLD support**: Second-level domain WHOIS server lookup (59 entries)
+- **Registry/Registrar enrichment**: NovaXNS tlddata + registrardata with KV cache
 - **Privacy protection detection**: Identifies WHOIS privacy services and reasons
+- **Availability detection**: Detects not-registered, reserved, throttled domains
+- **Geo normalization**: Country code/name normalization with aliases
 - **Contact merging**: Merges identical contact info with role array
-- **LLM formatting**: DeepSeek API integration for structured output
+- **LLM formatting**: DeepSeek API integration with thinking mode support
 - **Auto fallback**: Multiple parsing layers with automatic fallback
-- **Local file caching**: IANA data cached for 7 days
-- **145+ server templates**: Tokenizer templates for specific WHOIS servers
-- **250+ regex patterns**: Covering 199+ weppos/whois-parser server formats
+- **180+ field patterns**: Covering .jp, .kr, .cn, .uk, .de, .fi, .se, .at, .nl, .pt, .ee, .ai, .co, .ua, and more
+- **250+ regex patterns**: Regex-based parser for 199+ WHOIS server formats
 
 ## Multi-Layer Parsing Architecture
 
@@ -217,11 +220,12 @@ Contacts:
 
 | Data | Source | Cache |
 |------|--------|-------|
-| RDAP Endpoints | IANA RDAP Bootstrap (dns.json) | 7 days |
-| Registrar List | IANA Registrar IDs CSV | 7 days |
-| IPv4/IPv6 Allocations | IANA CSV | 7 days |
-| ASN Allocations | IANA CSV | 7 days |
-| Registry Info | tldlist.us | Built-in |
+| RDAP Endpoints | IANA RDAP Bootstrap (dns.json) | 30 days |
+| Registrar List | IANA Registrar IDs CSV | 30 days |
+| TLD Registry | NovaXNS/tlddata (IANA Root Zone) | 90 days |
+| Registrar Details | NovaXNS/registrardata (ICANN+IANA) | 90 days |
+| SLD WHOIS Servers | sld.csv (59 entries) | Built-in |
+| TLD→Registry | Built-in dictionary (1542 entries) | Built-in |
 
 ## Project Structure
 
@@ -230,18 +234,20 @@ ArashiDNS.WhoisLib/
 ├── Contracts/          # Interfaces and models
 ├── Core/               # WHOIS/RDAP clients and parsers
 ├── Data/               # IANA data providers and cache
-├── Detection/          # Privacy and registry detection
-├── Formatting/         # Traditional and LLM formatters
+├── Detection/          # Privacy and availability detection
+├── Formatting/         # Traditional, Regex, and LLM formatters
 ├── Parsing/            # Multi-layer parsing engine
 │   ├── Templates/      # Tokenizer templates (145+ servers)
 │   ├── RegexParser.cs  # Regex-based parser (250+ patterns)
 │   ├── TokenizerParser.cs  # Template-based parser
 │   ├── MultiLayerParser.cs # Multi-layer orchestrator
+│   ├── MultiLayerFormatter.cs # Formatting pipeline
 │   ├── AvailabilityDetector.cs  # Not-registered detection
 │   └── GeoNormalizer.cs  # Country/region normalization
 └── ServerDiscovery/    # Server lookup implementations
 
-ArashiDNS.WhoisCLI/    # CLI demo application
+ArashiDNS.WhoisCLI/     # CLI demo application
+ArashiDNS.WhoisWorker/  # Cloudflare Worker HTTP API
 ```
 
 ## Acknowledgments
