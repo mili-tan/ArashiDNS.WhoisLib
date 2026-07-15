@@ -34,8 +34,13 @@ export class RegistrarDataProvider {
   async findByName(name: string): Promise<RegistrarDataEntry | null> {
     await this.ensureLoaded();
     const lower = name.toLowerCase().trim();
-    for (const [key, entry] of this.byName!) {
-      if (key.includes(lower) || lower.includes(key)) return entry;
+    // Exact match first
+    if (this.byName!.has(lower)) return this.byName!.get(lower)!;
+    // Partial match: input contains key OR key contains input (min 4 chars)
+    if (lower.length >= 4) {
+      for (const [key, entry] of this.byName!) {
+        if (key.length >= 4 && (key.includes(lower) || lower.includes(key))) return entry;
+      }
     }
     return null;
   }

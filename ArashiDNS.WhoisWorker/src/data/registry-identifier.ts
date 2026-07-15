@@ -160,26 +160,32 @@ export async function identifyRegistrarFromData(
 
   const registrar = response.registrar;
 
+  // Try by IANA ID first
   if (registrar.ianaId) {
     const entry = await registrarDataProvider.findById(registrar.ianaId);
-    if (entry) {
-      registrar.name = entry.registrar_name || registrar.name;
-      registrar.website = entry.website || registrar.website;
-      registrar.whoisServer = entry.whois_server || registrar.whoisServer;
-      registrar.rdapUrl = entry.rdap_url || '';
-      registrar.status = entry.status || '';
-      registrar.country = entry.country || '';
-      if (entry.contact) {
-        registrar.contact = {
-          name: entry.contact.name,
-          phone: entry.contact.phone,
-          email: entry.contact.email,
-        };
+    if (entry && entry.registrar_name) {
+      // Verify the name is related (don't replace completely different registrars)
+      const whoisLower = registrar.name.toLowerCase();
+      const dataLower = entry.registrar_name.toLowerCase();
+      const isRelated = whoisLower.includes(dataLower) || dataLower.includes(whoisLower)
+        || whoisLower.split(/\s+/).some(w => w.length >= 4 && dataLower.includes(w));
+
+      if (isRelated || !registrar.name) {
+        registrar.name = entry.registrar_name;
+        registrar.website = entry.website || registrar.website;
+        registrar.whoisServer = entry.whois_server || registrar.whoisServer;
+        registrar.rdapUrl = entry.rdap_url || '';
+        registrar.status = entry.status || '';
+        registrar.country = entry.country || '';
+        if (entry.contact) {
+          registrar.contact = { name: entry.contact.name, phone: entry.contact.phone, email: entry.contact.email };
+        }
+        return registrar;
       }
-      return registrar;
     }
   }
 
+  // Try by name
   if (registrar.name) {
     const entry = await registrarDataProvider.findByName(registrar.name);
     if (entry) {
@@ -191,11 +197,7 @@ export async function identifyRegistrarFromData(
       registrar.status = entry.status || '';
       registrar.country = entry.country || '';
       if (entry.contact) {
-        registrar.contact = {
-          name: entry.contact.name,
-          phone: entry.contact.phone,
-          email: entry.contact.email,
-        };
+        registrar.contact = { name: entry.contact.name, phone: entry.contact.phone, email: entry.contact.email };
       }
       return registrar;
     }

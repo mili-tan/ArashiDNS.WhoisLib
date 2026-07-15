@@ -332,9 +332,50 @@ for (const [key, patterns] of Object.entries(FIELD_PATTERNS)) {
 }
 SORTED_PATTERNS.sort((a, b) => b[1].pattern.source.length - a[1].pattern.source.length);
 
+function preprocessSectionFormat(raw: string): string {
+  // Handle .uk-style section-based format where value is on next line:
+  //   Registrar:
+  //       GoDaddy.com, LLC. [Tag = GODADDY]
+  // Merge into single line: Registrar: GoDaddy.com, LLC. [Tag = GODADDY]
+  const lines = raw.split('\n');
+  const result: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Check if this line is a field label ending with ':' (no value after it)
+    if (trimmed.endsWith(':') && trimmed.length > 1) {
+      const afterColon = trimmed.slice(0, -1).trim();
+      // Check if next line exists and is indented (value on next line)
+      if (i + 1 < lines.length) {
+        const nextLine = lines[i + 1];
+        const nextTrimmed = nextLine.trim();
+        const nextIndent = nextLine.length - nextLine.trimStart().length;
+        const curIndent = line.length - line.trimStart().length;
+
+        if (nextTrimmed && nextIndent > curIndent && !nextTrimmed.endsWith(':')) {
+          // Merge: "Key: Value"
+          result.push(`${afterColon}: ${nextTrimmed}`);
+          i += 2;
+          continue;
+        }
+      }
+    }
+
+    result.push(trimmed);
+    i++;
+  }
+
+  return result.join('\n');
+}
+
 function extractFields(rawResponse: string): Map<string, string[]> {
+  // Preprocess section-based formats (.uk, etc.)
+  const processed = preprocessSectionFormat(rawResponse);
   const fields = new Map<string, string[]>();
-  const lines = rawResponse.split('\n');
+  const lines = processed.split('\n');
 
   for (const line of lines) {
     const trimmed = line.trim();
