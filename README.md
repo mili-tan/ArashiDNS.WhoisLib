@@ -20,35 +20,20 @@ A C# WHOIS/RDAP lookup library with multi-layer parsing, registry/registrar iden
 ## Multi-Layer Parsing Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│            MultiLayerParser (WhoisLookup)                    │
-│                                                             │
-│  Layer 1: TokenizerParser (template-based)                  │
-│           - 145+ server-specific templates (flipbit)        │
-│           - Pattern matching with transformers              │
-│                                                             │
-│  Layer 2: RegexParser (regex-based) ← Primary               │
-│           - 250+ regex patterns (weppos)                    │
-│           - Covers 199+ WHOIS server formats                │
-│                                                             │
-│  Layer 3: TraditionalFormatter (field mapping)              │
-│           - Original implementation, backward compatible    │
-│                                                             │
-│  Layer 4: SectionParser (section-based)                     │
-│           - Handles .kg, .cn, and similar formats           │
-│                                                             │
-│  Layer 5: LlmFormatter (LLM-based)                         │
-│           - DeepSeek API integration, final fallback        │
-│                                                             │
-│  PostProcessors:                                            │
-│           - AvailabilityDetector (not registered detection) │
-│           - GeoNormalizer (country/region standardization)  │
-│           - PrivacyDetector (privacy service detection)     │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+Layer 1: TokenizerParser (template-based, 145+ servers)
+    ↓
+Layer 2: RegexParser (regex-based, 250+ patterns) ← Primary
+    ↓
+Layer 3: TraditionalFormatter (field mapping, backward compatible)
+    ↓
+Layer 4: SectionParser (section-based, .kg/.cn etc.)
+    ↓
+Layer 5: LlmFormatter (LLM-based, final fallback)
+
+PostProcessors: AvailabilityDetector → GeoNormalizer → PrivacyDetector
 ```
 
-## Parsing Trace
+### Parsing Trace
 
 The `MultiLayerFormatter` reports which layer and parser was used:
 
@@ -271,12 +256,6 @@ This project's parsing engine is inspired by and references the following open-s
 | [weppos/whois](https://github.com/weppos/whois) | Ruby | WHOIS client architecture, server discovery |
 | [weppos/whois-parser](https://github.com/weppos/whois-parser) | Ruby | 199+ server-specific parsers, field patterns, Scanner/Tokenizer pattern |
 | [flipbit/whois](https://github.com/flipbit/whois) | .NET | Tokenizer template-based parsing, 145+ server templates |
-
-### What we learned from each project:
-
-- **weppos/whois**: Clean separation of client/parser, `property_supported` pattern, `available?`/`registered?` state detection
-- **weppos/whois-parser**: Per-server parser classes, Scanner-based tokenization, comprehensive field mappings for 199+ WHOIS servers
-- **flipbit/whois**: Tokenizer template syntax (`{ FieldName : Transformer }`), template matching with fallback, `CleanDomainStatus`/`ToHostName` transformers
 
 ## License
 
