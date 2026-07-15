@@ -5,8 +5,7 @@ import { BootstrapProvider } from './data/bootstrap-provider';
 import { RegistrarProvider, identifyRegistry, identifyRegistryFromTldData, identifyRegistrar, identifyRegistrarFromData } from './data/registry-identifier';
 import { TldDataProvider } from './data/tld-data-provider';
 import { RegistrarDataProvider } from './data/registrar-data-provider';
-import { detectPrivacy } from './detection/privacy-detector';
-import { LlmFormatter } from './formatting/llm-formatter';
+import { MultiLayerFormatter } from './formatting/multi-layer-formatter';
 
 function corsHeaders(origin: string | null): Record<string, string> {
   return {
@@ -102,24 +101,23 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
 
   const raw = url.searchParams.get('raw') === '1';
   const trace = url.searchParams.get('trace') === '1';
-  const useLlm = url.searchParams.get('llm') === '1';
   const showEmpty = url.searchParams.get('show_empty') === '1';
   const mode = url.searchParams.get('mode') || 'auto'; // auto | rdap | whois
 
   const queryType = detectQueryType(query);
   const tldProvider = new TldDataProvider(env.A_WHOIS_CACHE_KV);
+  const formatter = new MultiLayerFormatter(env);
 
   let response: WhoisResponse;
   let traceEntries: TraceEntry[] = [];
 
+  // Step 1: Query (RDAP / WHOIS / Auto)
   if (mode === 'whois') {
-    // WHOIS TCP mode
     const whoisClient = new WhoisTcpClient();
     const result = await whoisClient.query(query, queryType, tldProvider);
     response = result.response;
     traceEntries = result.trace;
   } else if (mode === 'auto') {
-    // Auto mode: try RDAP first, fallback to WHOIS TCP
     const bootstrap = new BootstrapProvider(env.A_WHOIS_CACHE_KV);
     const rdapClient = new RdapClient(bootstrap);
     const rdapResult = await rdapClient.query(query, queryType);
@@ -133,7 +131,6 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
       traceEntries.push(...whoisResult.trace);
     }
   } else {
-    // RDAP mode
     const bootstrap = new BootstrapProvider(env.A_WHOIS_CACHE_KV);
     const rdapClient = new RdapClient(bootstrap);
     const rdapResult = await rdapClient.query(query, queryType);
@@ -141,110 +138,50 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
     traceEntries = rdapResult.trace;
   }
 
-  const rawResponse = response.rawResponse;
-
-  // If query failed, try LLM fallback
   if (!response.isSuccessful) {
-    if (useLlm && env.DEEPSEEK_API_KEY && rawResponse) {
-      const llmFormatter = new LlmFormatter(env);
-      if (llmFormatter.isEnabled) {
-        const llmResult = await llmFormatter.format(rawResponse);
-        if (llmResult) {
-          return jsonResponse({
-            ...llmResult,
-            ...(raw ? { rawResponse } : {}),
-            ...(trace ? { trace: traceEntries } : {}),
-          }, 200, origin, !showEmpty);
-        }
-      }
-    }
-
     return jsonResponse({
       error: response.errorMessage,
       query,
       queryType,
-      ...(raw ? { rawResponse } : {}),
+      ...(raw ? { rawResponse: response.rawResponse } : {}),
       ...(trace ? { trace: traceEntries } : {}),
     }, 404, origin);
   }
 
-  // Enrich response
-  response.privacy = detectPrivacy(response);
+  // Step 2: Format (Traditional → LLM fallback)
+  const result = await formatter.format(response);
 
-  // Use TLD data for richer registry info
+  // Step 3: Enrich with external data
   const tldRegistry = await identifyRegistryFromTldData(response, tldProvider);
-  if (tldRegistry) {
-    response.registry = tldRegistry;
-  } else {
-    response.registry = identifyRegistry(response);
-  }
+  if (tldRegistry) result.registry = tldRegistry;
 
-  // Use registrar data for richer registrar info
-  const llmAvailable = useLlm && env.DEEPSEEK_API_KEY;
   const registrarDataProvider = new RegistrarDataProvider(env.A_WHOIS_CACHE_KV);
-
-  if (response.registrar?.ianaId || response.registrar?.name) {
+  if (result.registrar?.ianaId || result.registrar?.name) {
     const enriched = await identifyRegistrarFromData(response, registrarDataProvider);
-    if (enriched) response.registrar = enriched;
+    if (enriched) result.registrar = enriched;
   }
 
-  if (!response.registrar?.name && !llmAvailable) {
+  if (!result.registrar?.name) {
     const registrarProvider = new RegistrarProvider(env.A_WHOIS_CACHE_KV);
-    response.registrar = await identifyRegistrar(response, registrarProvider);
+    const fallback = await identifyRegistrar(response, registrarProvider);
+    if (fallback) result.registrar = fallback;
   }
 
-  const contacts = mergeContacts(response.contacts);
-
-  // Try LLM if registrar/dates are missing
-  if (llmAvailable && rawResponse) {
-    const needsLlm = !response.registrar?.name || !response.dates?.expires;
-    if (needsLlm) {
-      const llmFormatter = new LlmFormatter(env);
-      if (llmFormatter.isEnabled) {
-        const llmResult = await llmFormatter.format(rawResponse);
-        if (llmResult) {
-          traceEntries.push({
-            protocol: 'LLM',
-            endpoint: env.DEEPSEEK_API_ENDPOINT || 'deepseek',
-            formatter: 'LLM',
-            success: true,
-          });
-          return jsonResponse({
-            ...llmResult,
-            ...(raw ? { rawResponse } : {}),
-            ...(trace ? { trace: traceEntries } : {}),
-          }, 200, origin, !showEmpty);
-        }
-      }
-    }
-
-    // LLM didn't run or failed, fill registrar if missing
-    if (!response.registrar?.name) {
-      const enriched = await identifyRegistrarFromData(response, registrarDataProvider);
-      if (enriched) response.registrar = enriched;
-
-      if (!response.registrar?.name) {
-        const registrarProvider = new RegistrarProvider(env.A_WHOIS_CACHE_KV);
-        response.registrar = await identifyRegistrar(response, registrarProvider);
-      }
-    }
+  // Step 4: Add trace for formatter
+  if (formatter.lastUsedLayer) {
+    traceEntries.push({
+      protocol: response.rawResponse?.startsWith('{') ? 'RDAP' : 'WHOIS',
+      endpoint: response.whoisServer,
+      formatter: formatter.lastUsedLayer,
+      success: true,
+    });
   }
 
-  const result: FormattedResult = {
-    domain: response.domain,
-    registry: response.registry,
-    registrar: response.registrar,
-    privacy: response.privacy,
-    contacts,
-    dates: response.dates,
-    nameServers: response.nameServers,
-    status: response.statuses,
-    dnssec: response.dnssec,
-    ...(raw ? { rawResponse: rawResponse || undefined } : {}),
+  return jsonResponse({
+    ...result,
+    ...(raw ? { rawResponse: response.rawResponse || undefined } : {}),
     ...(trace ? { trace: traceEntries } : {}),
-  };
-
-  return jsonResponse(result, 200, origin, !showEmpty);
+  }, 200, origin, !showEmpty);
 }
 
 interface RawContactCollection {
