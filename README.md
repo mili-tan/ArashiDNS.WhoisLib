@@ -35,13 +35,9 @@ PostProcessors: AvailabilityDetector → GeoNormalizer → PrivacyDetector
 
 ### Parsing Trace
 
-The `MultiLayerFormatter` reports which layer and parser was used:
-
 ```
-Trace: MultiLayer(Regex/RegexParser:15fields)
-Trace: MultiLayer(Tokenizer/TemplateParser:12fields)
-Trace: MultiLayer(Traditional/FieldMapping:10fields)
-Trace: MultiLayer(LLM/DeepSeek:18fields)
+[OK] RDAP -> MultiLayer(Regex/RegexParser:15fields)
+[OK] WHOIS -> MultiLayer(Tokenizer/TemplateParser:12fields)
 ```
 
 ## Quick Start
