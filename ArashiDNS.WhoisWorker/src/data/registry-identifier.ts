@@ -102,10 +102,12 @@ export async function identifyRegistryFromTldData(
   const entry = await tldProvider.getTldInfo(tld);
   if (!entry) return null;
 
+  // Only fill in missing fields, don't overwrite existing data
+  const existing = response.registry;
   return {
-    name: entry.manager || entry.sponsoring_organisation || '',
-    website: entry.registration_url || '',
-    whoisServer: entry.whois_server || '',
+    name: existing?.name || entry.manager || entry.sponsoring_organisation || '',
+    website: existing?.website || entry.registration_url || '',
+    whoisServer: existing?.whoisServer || entry.whois_server || '',
     rdapEndpoint: entry.rdap_server || '',
     type: entry.type || '',
     manager: entry.manager || '',
@@ -163,13 +165,14 @@ export async function identifyRegistrarFromData(
   if (registrar.ianaId) {
     const entry = await registrarDataProvider.findById(registrar.ianaId);
     if (entry) {
-      registrar.name = entry.registrar_name || registrar.name;
-      registrar.website = entry.website || registrar.website;
-      registrar.whoisServer = entry.whois_server || registrar.whoisServer;
-      registrar.rdapUrl = entry.rdap_url || '';
-      registrar.status = entry.status || '';
-      registrar.country = entry.country || '';
-      if (entry.contact) {
+      // Only fill in missing fields
+      if (!registrar.name) registrar.name = entry.registrar_name || '';
+      if (!registrar.website) registrar.website = entry.website || '';
+      if (!registrar.whoisServer) registrar.whoisServer = entry.whois_server || '';
+      if (!registrar.rdapUrl) registrar.rdapUrl = entry.rdap_url || '';
+      if (!registrar.status) registrar.status = entry.status || '';
+      if (!registrar.country) registrar.country = entry.country || '';
+      if (!registrar.contact && entry.contact) {
         registrar.contact = { name: entry.contact.name, phone: entry.contact.phone, email: entry.contact.email };
       }
       return registrar;
@@ -179,14 +182,13 @@ export async function identifyRegistrarFromData(
   if (registrar.name) {
     const entry = await registrarDataProvider.findByName(registrar.name);
     if (entry) {
-      registrar.ianaId = entry.iana_id || registrar.ianaId;
-      registrar.name = entry.registrar_name || registrar.name;
-      registrar.website = entry.website || registrar.website;
-      registrar.whoisServer = entry.whois_server || registrar.whoisServer;
-      registrar.rdapUrl = entry.rdap_url || '';
-      registrar.status = entry.status || '';
-      registrar.country = entry.country || '';
-      if (entry.contact) {
+      if (!registrar.ianaId) registrar.ianaId = entry.iana_id || '';
+      if (!registrar.website) registrar.website = entry.website || '';
+      if (!registrar.whoisServer) registrar.whoisServer = entry.whois_server || '';
+      if (!registrar.rdapUrl) registrar.rdapUrl = entry.rdap_url || '';
+      if (!registrar.status) registrar.status = entry.status || '';
+      if (!registrar.country) registrar.country = entry.country || '';
+      if (!registrar.contact && entry.contact) {
         registrar.contact = { name: entry.contact.name, phone: entry.contact.phone, email: entry.contact.email };
       }
       return registrar;
