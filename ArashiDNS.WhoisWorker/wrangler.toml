@@ -13,5 +13,5 @@ compatibility_date = "2024-12-01"
 
 [[kv_namespaces]]
 binding = "A_WHOIS_CACHE_KV"
-id = "placeholder"                      # Replace with actual KV namespace ID after creation
+id = "491fee1dc37f4308844d77a306d39d73"
 # preview_id = "preview_id"             # Optional: for wrangler dev
