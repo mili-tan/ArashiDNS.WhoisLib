@@ -9,7 +9,7 @@ namespace ArashiDNS.WhoisLib.Formatting;
 /// <summary>
 /// Multi-layer formatter that combines multiple parsing strategies:
 /// Layer 1: TokenizerParser (template-based, inspired by flipbit/whois)
-/// Layer 2: RegexParser (regex-based, inspired by weppos/whois-parser)
+/// Layer 2: RegexWhoisParserWrapper (234 server-specific parsers from ArashiDNS.RegexWhoisParser)
 /// Layer 3: TraditionalParser (field mapping, original implementation)
 /// Layer 4: SectionParser (section-based, for .kg, .cn etc.)
 /// Layer 5: LlmFormatter (LLM-based, final fallback)

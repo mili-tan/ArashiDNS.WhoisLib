@@ -7,6 +7,7 @@ namespace ArashiDNS.WhoisLib.Parsing;
 /// Regex-based WHOIS parser (inspired by weppos/whois-parser)
 /// Uses regex patterns to extract fields from WHOIS responses
 /// </summary>
+[Obsolete("Use RegexWhoisParserWrapper instead. This class is kept for backward compatibility but is no longer actively maintained.")]
 public partial class RegexParser
 {
     private static readonly Dictionary<string, List<FieldPattern>> FieldPatterns = new(StringComparer.OrdinalIgnoreCase)

@@ -1,3 +1,6 @@
+/**
+ * @deprecated Use RegexWhoisParserFormatter instead. This file is kept for backward compatibility but is no longer actively maintained.
+ */
 import type { WhoisResponse, ContactCollection, ContactInfo, RegistrarInfo, DomainDates, DnssecInfo, WhoisQueryType } from '../types';
 
 interface FieldPattern {
