@@ -50,6 +50,7 @@ node_modules/
 dist/
 .wrangler/
 .dev.vars
+wrangler.toml
 
 ## Agent Skills
 .agents/
