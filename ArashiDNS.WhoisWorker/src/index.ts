@@ -1235,6 +1235,11 @@ const HTML_PAGE = `<!DOCTYPE html>
                     if (c.organization) items.push(['Organization', c.organization]);
                     if (c.email) items.push(['Email', c.email]);
                     if (c.phone) items.push(['Phone', c.phone]);
+                    if (c.street) items.push(['Street', c.street]);
+                    if (c.city) items.push(['City', c.city]);
+                    if (c.state) items.push(['State', c.state]);
+                    if (c.postalCode) items.push(['Postal Code', c.postalCode]);
+                    if (c.country) items.push(['Country', c.country]);
                     if (c.roles) items.push(['Roles', c.roles.join(', ')]);
                     if (items.length) {
                         const label = c.roles?.[0] ? c.roles[0].charAt(0).toUpperCase() + c.roles[0].slice(1) : 'Contact ' + (i + 1);
