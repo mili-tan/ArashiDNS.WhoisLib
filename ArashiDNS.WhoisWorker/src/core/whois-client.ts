@@ -590,7 +590,7 @@ export class WhoisTcpClient {
 
     // Try UTF-8, fallback to Latin1
     try {
-      const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      const text = new TextDecoder('utf-8').decode(bytes);
       if (!text.includes('\uFFFD')) return text;
     } catch {}
     return new TextDecoder('latin1').decode(bytes);

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>ArashiDNS.WhoisLib</RootNamespace>
@@ -16,6 +16,10 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Parsing\Templates\**\*.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ArashiDNS.RegexWhoisParser\ArashiDNS.RegexWhoisParser\ArashiDNS.RegexWhoisParser.csproj" />
   </ItemGroup>
 
 </Project>

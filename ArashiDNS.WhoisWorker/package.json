@@ -8,6 +8,9 @@
     "deploy:temp": "wrangler deploy --temporary",
     "test": "vitest run"
   },
+  "dependencies": {
+    "whois-parser": "file:../ArashiDNS.RegexWhoisParser/ArashiDNS.RegexWhoisParser.TS"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241218.0",
     "typescript": "^5.7.2",

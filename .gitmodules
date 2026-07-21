@@ -1,0 +1,3 @@
+[submodule "ArashiDNS.RegexWhoisParser"]
+	path = ArashiDNS.RegexWhoisParser
+	url = https://github.com/mili-tan/ArashiDNS.RegexWhoisParser.git

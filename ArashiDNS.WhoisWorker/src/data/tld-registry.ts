@@ -1,4 +1,4 @@
-﻿import type { TldInfo } from './types';
+﻿import type { TldInfo } from '../types';
 
 export const TLD_REGISTRY: Record<string, TldInfo> = {
   "xn--mix891f": { registryName: "Macao Post and Telecommunications Bureau (CTT)", website: "https://www.monic.mo", whoisServer: "whois.monic.mo", rdapEndpoint: "" },

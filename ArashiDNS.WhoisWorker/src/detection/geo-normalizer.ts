@@ -133,7 +133,7 @@ export function getCountryName(code: string): string | null {
 }
 
 export function normalizeGeo(country: string | null, state?: string | null, city?: string | null, street?: string | null): GeoInfo {
-  const info: GeoInfo = { country, state: state ?? null, city: city ?? null, street: street ?? null };
+  const info: GeoInfo = { country, countryCode: null, state: state ?? null, city: city ?? null, street: street ?? null };
 
   if (country) {
     const code = identifyCountryCode(country);

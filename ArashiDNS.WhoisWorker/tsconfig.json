@@ -14,6 +14,6 @@
     "jsx": "react-jsx",
     "jsxImportSource": "react"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "../ArashiDNS.RegexWhoisParser/ArashiDNS.RegexWhoisParser.TS/**/*.ts"],
   "exclude": ["node_modules"]
 }
