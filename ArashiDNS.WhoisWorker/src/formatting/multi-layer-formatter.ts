@@ -41,17 +41,17 @@ export class MultiLayerFormatter {
     if (response.rawResponse) {
       const regexResult = this.regexParser.parse(response.rawResponse, response.query, response.queryType, response.whoisServer);
       if (regexResult && this.hasUsefulData(regexResult)) {
-        // Check if critical data is missing
-        if (this.hasCriticalData(regexResult)) {
+        // Check if we have complete data (dates + registrant)
+        if (this.hasCompleteData(regexResult)) {
           this.lastUsedLayer = 'RegexWhoisParser';
           return this.postProcess(regexResult);
         }
-        // Missing critical data, try Traditional layer and merge
+        // Missing contacts, try Traditional layer and merge
         if (this.hasUsefulData(response)) {
           this.mergeMissingFields(regexResult, response);
         }
-        // Still missing critical data, try LLM
-        if (!this.hasCriticalData(regexResult) && this.llmFormatter?.isEnabled) {
+        // Still missing contacts, try LLM
+        if (!this.hasRegistrantData(regexResult) && this.llmFormatter?.isEnabled) {
           const llmResult = await this.llmFormatter.format(response.rawResponse);
           if (llmResult) {
             this.mergeMissingFieldsFromFormatted(regexResult, llmResult);
@@ -64,11 +64,11 @@ export class MultiLayerFormatter {
 
     // Layer 2: Traditional (already parsed in whois-client.ts)
     if (this.hasUsefulData(response)) {
-      if (this.hasCriticalData(response)) {
+      if (this.hasCompleteData(response)) {
         this.lastUsedLayer = 'Traditional';
         return this.postProcess(response);
       }
-      // Missing critical data, try LLM
+      // Missing contacts, try LLM
       if (response.rawResponse && this.llmFormatter?.isEnabled) {
         const llmResult = await this.llmFormatter.format(response.rawResponse);
         if (llmResult) {
@@ -120,6 +120,19 @@ export class MultiLayerFormatter {
     if (r && (r.name || r.organization || r.email)) return true;
 
     return false;
+  }
+
+  private hasCompleteData(response: WhoisResponse): boolean {
+    // Has both dates AND registrant contact info
+    const hasDates = !!(response.dates?.created || response.dates?.expires);
+    const r = response.contacts.registrant;
+    const hasRegistrant = !!(r && (r.name || r.organization || r.email));
+    return hasDates && hasRegistrant;
+  }
+
+  private hasRegistrantData(response: WhoisResponse): boolean {
+    const r = response.contacts.registrant;
+    return !!(r && (r.name || r.organization || r.email));
   }
 
   private mergeMissingFields(target: WhoisResponse, source: WhoisResponse): void {

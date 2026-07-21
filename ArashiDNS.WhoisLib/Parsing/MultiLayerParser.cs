@@ -64,17 +64,17 @@ public class MultiLayerParser
         var result = TryTokenizerParse(rawResponse, server);
         if (result.IsSuccessful && HasUsefulData(result))
         {
-            if (HasCriticalData(result))
+            if (HasCompleteData(result))
                 return PostProcess(result);
-            // Tokenizer parsed but missing critical data, try next layer and merge
+            // Tokenizer parsed but missing contacts, try next layer and merge
             var regexResult = TryRegexWhoisParse(rawResponse, server);
             if (regexResult.IsSuccessful)
             {
                 MergeMissingFields(result, regexResult);
-                if (HasCriticalData(result))
+                if (HasCompleteData(result))
                     return PostProcess(result);
             }
-            // Still missing critical data, try section parser
+            // Still missing contacts, try section parser
             var sectionResult = TrySectionParse(rawResponse, server);
             if (sectionResult.IsSuccessful)
             {
@@ -87,9 +87,9 @@ public class MultiLayerParser
         result = TryRegexWhoisParse(rawResponse, server);
         if (result.IsSuccessful)
         {
-            if (HasCriticalData(result))
+            if (HasCompleteData(result))
                 return PostProcess(result);
-            // RegexWhoisParser parsed but missing critical data, try section parser
+            // RegexWhoisParser parsed but missing contacts, try section parser
             var sectionResult = TrySectionParse(rawResponse, server);
             if (sectionResult.IsSuccessful)
             {
@@ -358,6 +358,34 @@ public class MultiLayerParser
                 return true;
         }
 
+        return false;
+    }
+
+    /// <summary>
+    /// Check if response has complete data: both dates AND registrant info
+    /// </summary>
+    private static bool HasCompleteData(WhoisResponse response)
+    {
+        var hasDates = response.Dates?.Created != null || response.Dates?.Expires != null;
+        var hasRegistrant = false;
+        if (response.Contacts?.Registrant != null)
+        {
+            var r = response.Contacts.Registrant;
+            hasRegistrant = !string.IsNullOrEmpty(r.Name) || !string.IsNullOrEmpty(r.Organization) || !string.IsNullOrEmpty(r.Email);
+        }
+        return hasDates && hasRegistrant;
+    }
+
+    /// <summary>
+    /// Check if response has registrant contact info
+    /// </summary>
+    private static bool HasRegistrantData(WhoisResponse response)
+    {
+        if (response.Contacts?.Registrant != null)
+        {
+            var r = response.Contacts.Registrant;
+            return !string.IsNullOrEmpty(r.Name) || !string.IsNullOrEmpty(r.Organization) || !string.IsNullOrEmpty(r.Email);
+        }
         return false;
     }
 
